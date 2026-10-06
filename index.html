@@ -620,14 +620,13 @@ function renderUnits(){
   $("#unitList").innerHTML =
     `<li><button data-unit="" aria-current="${!S.unit&&!S.view&&!S.prop}"><span class="code">ALL</span><span class="nm">All properties</span><span class="ct">${total}</span></button></li>`+
     `<li><button data-unit="__products" aria-current="${S.view==="products"}"><span class="code nav">AST</span><span class="nm">Assets</span><span class="ct">${S.cat?S.cat.products.filter(p=>p.active).length:""}</span></button></li>`+
-    `<li><button data-unit="__inventories" aria-current="${S.view==="inventories"||S.view==="inv-edit"}"><span class="code nav">INV</span><span class="nm">Inventories</span><span class="ct">${S.invs?S.invs.length:""}</span></button></li>`+
+    `<li><button data-unit="__inventories" aria-current="${S.view==="inventories"||S.view==="inv-edit"||S.view==="documents"}"><span class="code nav">INV</span><span class="nm">Inventories</span><span class="ct">${S.invs?S.invs.length:""}</span></button></li>`+
     `<li><button data-unit="__transfers" aria-current="${S.view==="transfers"}"><span class="code nav">TRF</span><span class="nm">Transfers</span><span class="ct"></span></button></li>`+
-    `<li><button data-unit="__documents" aria-current="${S.view==="documents"}"><span class="code nav">DOC</span><span class="nm">Documents</span><span class="ct">${S.docs?S.docs.length:""}</span></button></li>`+
     `<li><button data-unit="__reprint" aria-current="${S.view==="reprint"}"><span class="code warn">TAG</span><span class="nm">Labels to reprint</span><span class="ct">${S.reprint.length}</span></button></li><li class="sep" aria-hidden="true"></li>`+
     groupedUnits(list).map(g=>{const open=f||!S.collapsed[g.prop]||g.units.some(u=>u.code===S.unit);const n=g.units.reduce((a,u)=>a+(u.count||0),0);
       return `<li class="prop"><button data-prop="${esc(g.prop)}" aria-expanded="${!!open}" aria-current="${!S.unit&&!S.view&&S.prop===g.prop&&g.prop!==""}"><span class="chev" aria-hidden="true">${open?"▾":"▸"}</span><span class="nm">${esc(g.name)}</span><span class="ct">${n}</span></button></li>`+
       (open?g.units.map(u=>`<li class="sub"><button data-unit="${esc(u.code)}" aria-current="${S.unit===u.code}"><span class="code">${esc(u.unitCode||u.code)}</span><span class="nm">${esc(u.name)}</span><span class="ct">${u.count||0}</span></button></li>`).join(""):"")}).join("");
-  $("#unitSelect").innerHTML=`<option value="">All units (${S.units.length})</option><option value="__products" ${S.view==="products"?"selected":""}>Assets</option><option value="__inventories" ${S.view==="inventories"||S.view==="inv-edit"?"selected":""}>Inventories</option><option value="__transfers" ${S.view==="transfers"?"selected":""}>Transfers</option><option value="__documents" ${S.view==="documents"?"selected":""}>Documents</option><option value="__reprint" ${S.view==="reprint"?"selected":""}>Labels to reprint (${S.reprint.length})</option>`+groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="__prop:${esc(g.prop)}" ${!S.unit&&!S.view&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("");
+  $("#unitSelect").innerHTML=`<option value="">All units (${S.units.length})</option><option value="__products" ${S.view==="products"?"selected":""}>Assets</option><option value="__inventories" ${S.view==="inventories"||S.view==="inv-edit"||S.view==="documents"?"selected":""}>Inventories</option><option value="__transfers" ${S.view==="transfers"?"selected":""}>Transfers</option><option value="__reprint" ${S.view==="reprint"?"selected":""}>Labels to reprint (${S.reprint.length})</option>`+groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="__prop:${esc(g.prop)}" ${!S.unit&&!S.view&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("");
 }
 $("#unitList").addEventListener("click",e=>{
   const pb=e.target.closest("button[data-prop]");
@@ -1085,14 +1084,18 @@ const docUrl=f=>"https://drive.google.com/file/d/"+encodeURIComponent(f.id)+"/vi
 const docDate=d=>d&&d.date?fmtDate(Date.parse(d.date+"T00:00:00")):"";
 const fileChips=fs=>(fs||[]).map(f=>`<a class="docfile" href="${esc(docUrl(f))}" target="_blank" rel="noopener" title="${esc(f.name)}">${/pdf/i.test((f.mime||"")+f.name)?"PDF":/^image/i.test(f.mime||"")?"IMG":"FILE"} · ${esc(f.name)}</a>`).join("");
 function docsFor(pred){return (S.docs||[]).filter(pred).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.id).localeCompare(String(a.id)))}
+function invTabs(){const n=(S.docs||[]).length;
+  return `<div class="tabs" role="tablist"><button role="tab" data-itab="inventories" aria-selected="${S.view!=="documents"}">Inventories${S.invs?` (${S.invs.length})`:""}</button><button role="tab" data-itab="documents" aria-selected="${S.view==="documents"}">Documents${n?` (${n})`:""}</button></div>`}
+function wireInvTabs(){document.querySelectorAll("#view [data-itab]").forEach(b=>b.onclick=()=>{if(S.view===b.dataset.itab) return;S.view=b.dataset.itab;renderUnits();renderView()})}
 function renderDocuments(v){
   if(!S.docs){v.innerHTML=`<div class="empty"><h3>Loading documents…</h3></div>`;return}
   const f=S.docFilter=S.docFilter||{q:"",type:"",unit:""},q=f.q.toLowerCase();
   const inScope=d=>!f.unit||(f.unit.startsWith("P:")?!!d.unit&&(S.units.find(u=>u.code===d.unit)||{}).property===f.unit.slice(2):d.unit===f.unit);
   const rows=docsFor(d=>(!f.type||d.type===f.type)&&inScope(d)&&(!q||[d.id,d.type,d.number,d.vendor,d.notes,d.inventory,d.unit?unitLabel(d.unit):"",...(d.files||[]).map(x=>x.name)].join(" ").toLowerCase().includes(q)));
   const keep=document.activeElement?.id==="docQ";
-  v.innerHTML=`<div class="pagehead"><div><h2>Documents</h2><div class="sub">Purchase orders, delivery orders, invoices and other paperwork, linked to units and inventories. <span class="num">${rows.length}</span> document${rows.length===1?"":"s"}</div></div>
+  v.innerHTML=`<div class="pagehead"><div><h2>Inventories</h2><div class="sub">Purchase orders, delivery orders, invoices and other paperwork, linked to units and inventories. <span class="num">${rows.length}</span> document${rows.length===1?"":"s"}</div></div>
     <div class="actions"><button class="btn primary" data-write id="docNew">+ Upload document</button></div></div>
+    ${invTabs()}
     <div class="toolbar"><input id="docQ" placeholder="Search number, vendor, file name" value="${esc(f.q)}" aria-label="Search documents">
       <select id="docType" aria-label="Type"><option value="">All types</option>${DOC_TYPES.map(t=>`<option ${f.type===t?"selected":""}>${esc(t)}</option>`).join("")}</select>
       <select id="docUnit" aria-label="Property or unit"><option value="">All properties and units</option>${groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="P:${esc(g.prop)}" ${f.unit==="P:"+g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${f.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
@@ -1101,6 +1104,7 @@ function renderDocuments(v){
     </tbody></table></div>`:`<div class="empty"><h3>${S.docs.length?"No documents match":"No documents yet"}</h3><p>Upload purchase orders, delivery orders, invoices or warranties as a PDF or a photo. Link each one to a unit and inventory so it's easy to find for audits and move-outs.</p></div>`}`;
   const qi=$("#docQ");qi.oninput=e=>{f.q=e.target.value;renderView()};if(keep){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length)}
   $("#docType").onchange=e=>{f.type=e.target.value;renderView()};$("#docUnit").onchange=e=>{f.unit=e.target.value;renderView()};
+  wireInvTabs();
   $("#docNew").onclick=()=>openDocForm(null,{unit:f.unit&&!f.unit.startsWith("P:")?f.unit:""});
   v.querySelector("tbody")?.addEventListener("click",e=>{if(e.target.closest("a")) return;const r=e.target.closest("tr[data-doc]");if(r) openDocForm(S.docs.find(x=>x.id===r.dataset.doc))});
   applyWriteGate();
@@ -1109,7 +1113,8 @@ function openDocForm(doc,pre){
   const isNew=!doc;pre=pre||{};
   const d=doc?JSON.parse(JSON.stringify(doc)):{type:pre.type||"Purchase order (PO)",number:"",date:localDay(),vendor:"",unit:pre.unit||"",inventory:pre.inventory||"",amount:"",notes:"",files:[]};
   const files=[...(d.files||[])],removed=[],picked=[];
-  const invOpts=u=>(S.invs||[]).filter(i=>!u||i.unit===u).sort((a,b)=>b.id.localeCompare(a.id)).map(i=>`<option value="${esc(i.id)}" ${d.inventory===i.id?"selected":""}>${esc(i.id)} · ${esc(i.name)}${u?"":" · "+esc(unitLabel(i.unit))}</option>`).join("");
+  const invList=u=>{const l=(S.invs||[]).filter(i=>!u||i.unit===u);if(d.inventory&&(!u||u===d.unit)&&!l.some(i=>i.id===d.inventory)) l.push({id:d.inventory,name:S.edit&&S.edit.inv.id===d.inventory?S.edit.inv.name:"",unit:d.unit});return l};
+  const invOpts=u=>invList(u).sort((a,b)=>b.id.localeCompare(a.id)).map(i=>`<option value="${esc(i.id)}" ${d.inventory===i.id?"selected":""}>${esc(i.id)} · ${esc(i.name)}${u?"":" · "+esc(unitLabel(i.unit))}</option>`).join("");
   modal(`<h3>${isNew?"Upload document":"Document "+esc(d.id)}</h3>
    <form class="grid" id="dcf">
     <div class="field"><label for="dc-type">Type</label><select id="dc-type">${DOC_TYPES.map(t=>`<option ${d.type===t?"selected":""}>${esc(t)}</option>`).join("")}</select></div>
@@ -1166,13 +1171,14 @@ function openDocForm(doc,pre){
   applyWriteGate();
 }
 function invDocsHtml(id){
-  const ds=docsFor(d=>d.inventory===id);
+  const ds=id?docsFor(d=>d.inventory===id):[];
   return `<section class="panel"><div class="pagehead" style="margin:0"><h3 class="h3" style="margin:0">Documents</h3><div class="actions"><button class="btn" data-write id="ieDocAdd">+ Attach PO / DO</button></div></div>
    ${ds.length?`<ul class="log" style="margin-top:8px">${ds.map(d=>`<li><span><span class="pill s-storage">${esc(docShort(d.type))}</span> <b>${esc(d.number||d.id)}</b> <span class="muted">${esc([docDate(d),d.vendor].filter(Boolean).join(" · "))}</span> <button type="button" class="linkback" data-doc="${esc(d.id)}" style="margin:0;color:var(--accent)">Edit</button><br>${fileChips(d.files)}</span></li>`).join("")}</ul>`
-     :`<p class="muted" style="margin:8px 0 0;font-size:14px">No PO, DO or invoice attached yet.</p>`}</section>`;
+     :`<p class="muted" style="margin:8px 0 0;font-size:14px">${id?"No PO, DO or invoice attached yet.":"Attach the purchase order for this batch. The inventory is saved first, then you can upload the PO."}</p>`}</section>`;
 }
 function wireInvDocs(inv){
-  const b=$("#ieDocAdd");if(b) b.onclick=()=>openDocForm(null,{unit:inv.unit,inventory:inv.id});
+  const b=$("#ieDocAdd");if(b) b.onclick=()=>{if(inv.id&&!S.dirty) return openDocForm(null,{unit:inv.unit,inventory:inv.id});
+    saveInventory(()=>openDocForm(null,{unit:S.edit.inv.unit,inventory:S.edit.inv.id}))};
   document.querySelectorAll("#view [data-doc]").forEach(x=>x.onclick=()=>openDocForm((S.docs||[]).find(d=>d.id===x.dataset.doc)));
 }
 
@@ -2314,6 +2320,7 @@ function renderInventories(v){
   const sum=rows.reduce((t,i)=>({items:t.items+i.items,tagged:t.tagged+i.tagged,value:t.value+i.value}),{items:0,tagged:0,value:0});
   v.innerHTML=`<div class="pagehead"><div><h2>Inventories${f.unit?` · ${esc(f.unit.startsWith("P:")?propName(f.unit.slice(2)):unitLabel(f.unit))}`:""}</h2><div class="sub">Assets assigned to units, with quantities. <span class="num">${rows.length}</span> inventor${rows.length===1?"y":"ies"} · <span class="num">${sum.items.toLocaleString()}</span> items · ${money(sum.value)}</div></div>
     <div class="actions"><button class="btn primary" data-write id="invNew" ${S.units.length?"":"disabled"}>+ New inventory</button><button class="btn" onclick="openReport()">Inventory report</button></div></div>
+    ${invTabs()}
     <div class="toolbar"><select id="ifUnit" aria-label="Business unit"><option value="">All properties and units</option>${groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="P:${esc(g.prop)}" ${f.unit==="P:"+g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${f.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("")}</select>
       <select id="ifStatus" aria-label="Status"><option value="">All statuses</option>${INV_STATUSES.map(s=>`<option ${f.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
     ${rows.length?`<div class="ledger-wrap"><table class="ledger"><thead><tr><th>ID</th><th>Inventory</th><th>Unit</th><th>Date</th><th>Status</th><th style="text-align:right">Items</th><th>Tagged</th><th style="text-align:right">Here now</th><th style="text-align:right">Value</th></tr></thead><tbody>
@@ -2327,7 +2334,7 @@ function renderInventories(v){
   if(!S.itemsByTag&&rows.length) loadAllItems().then(()=>{if(S.view==="inventories") renderView()}).catch(()=>{});
   $("#ifUnit").onchange=e=>{S.invFilter.unit=e.target.value;renderView()};
   $("#ifStatus").onchange=e=>{S.invFilter.status=e.target.value;renderView()};
-  $("#invNew").onclick=()=>newInventory();
+  $("#invNew").onclick=()=>newInventory();wireInvTabs();
   v.querySelector("tbody")?.addEventListener("click",e=>{const r=e.target.closest("tr[data-inv]");if(r) openInventory(r.dataset.inv)});
   applyWriteGate();
 }
@@ -2371,7 +2378,7 @@ function renderInvEditor(v){
       <div class="field"><label for="ie-status">Status</label><select id="ie-status">${INV_STATUSES.map(s=>`<option ${inv.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
       <div class="field span3"><label for="ie-notes">Notes</label><input id="ie-notes" value="${esc(inv.notes)}" placeholder="PO number, delivery date, who requested it…"></div>
     </div></section>
-    ${saved?invDocsHtml(inv.id):""}
+    ${invDocsHtml(inv.id)}
     <div class="pagehead" style="margin-top:4px"><h3 class="h3">Assets</h3><div class="actions"><button class="btn primary" data-write id="ieAdd">+ Add assets</button><button class="btn" data-write id="ieNewAsset">+ New asset</button></div></div>
     ${E.lines.length?`<div class="ledger-wrap"><table class="ledger lines"><thead><tr><th>Asset</th><th style="width:96px">Qty</th><th>Location</th><th>Notes</th><th style="text-align:right">Line value</th><th>Tagged</th><th></th></tr></thead><tbody>
       ${E.lines.map((l,i)=>{const p=prodById(l.productId)||{name:"(deleted asset)",price:0,photos:[]};const tg=l.tagged||0;
