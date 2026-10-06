@@ -142,6 +142,8 @@ pre.sample{background:var(--sunk);border-radius:var(--r);padding:10px;font-famil
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);z-index:60;max-width:calc(100% - 32px);font-size:14px;box-shadow:0 6px 24px rgb(0 0 0 / .25)}
 .selbar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);align-self:center;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--ink);color:var(--bg);padding:8px 10px 8px 16px;border-radius:999px;box-shadow:0 8px 28px rgb(0 0 0 / .25)}
 .selbar .btn{border-radius:999px}
+.label-card.void .qr{opacity:.18;filter:grayscale(1)}.label-card.void .big{text-decoration:line-through;opacity:.6}
+.docfile{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:12.5px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0}.docfile.new{color:var(--ink)}.docrow{display:flex;align-items:center;gap:4px}
 
 .check{display:flex;gap:8px;align-items:center;cursor:pointer}
 .report-list{margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:grid;gap:3px}
@@ -374,7 +376,7 @@ async function call(fn,...args){
   return j.result;
 }
 const clone=o=>o===undefined?undefined:JSON.parse(JSON.stringify(o));
-const COLS=["units","properties","assets","products","vendors","inventories","transfers","counters"];
+const COLS=["units","properties","assets","products","vendors","inventories","transfers","counters","documents"];
 const M={};COLS.forEach(c=>M[c]=new Map());
 let serverTime=0,code=LS("code");
 const listeners=new Set();          // {kind,col,path,q,cb}
@@ -507,6 +509,8 @@ const assets={upload:async(blob)=>{const id=await call("apiUploadPhoto",code,awa
   delete:async id=>({deleted:await call("apiDeletePhoto",code,id)}),list:async()=>({assets:[],usage:{}})};
 const photoCache={};
 window.photoData=id=>photoCache[id]=photoCache[id]||call("apiPhotoData",code,id);
+window.uploadDocFile=async f=>{if(f.size>15*1024*1024) throw new Error(f.name+" is larger than 15 MB. Please use a smaller file.");return call("apiUploadDoc",code,f.name,(await blobToDataUrl(f)).split(",")[1],f.type||"application/octet-stream")};
+window.deleteDocFile=id=>call("apiDeletePhoto",code,id);
 
 /* ---------- downloads: label sheets open in a new tab, files are saved to Google Drive ---------- */
 const dlbar=document.createElement("div");dlbar.id="dlbar";dlbar.hidden=true;document.body.appendChild(dlbar);
@@ -618,11 +622,12 @@ function renderUnits(){
     `<li><button data-unit="__products" aria-current="${S.view==="products"}"><span class="code nav">AST</span><span class="nm">Assets</span><span class="ct">${S.cat?S.cat.products.filter(p=>p.active).length:""}</span></button></li>`+
     `<li><button data-unit="__inventories" aria-current="${S.view==="inventories"||S.view==="inv-edit"}"><span class="code nav">INV</span><span class="nm">Inventories</span><span class="ct">${S.invs?S.invs.length:""}</span></button></li>`+
     `<li><button data-unit="__transfers" aria-current="${S.view==="transfers"}"><span class="code nav">TRF</span><span class="nm">Transfers</span><span class="ct"></span></button></li>`+
+    `<li><button data-unit="__documents" aria-current="${S.view==="documents"}"><span class="code nav">DOC</span><span class="nm">Documents</span><span class="ct">${S.docs?S.docs.length:""}</span></button></li>`+
     `<li><button data-unit="__reprint" aria-current="${S.view==="reprint"}"><span class="code warn">TAG</span><span class="nm">Labels to reprint</span><span class="ct">${S.reprint.length}</span></button></li><li class="sep" aria-hidden="true"></li>`+
     groupedUnits(list).map(g=>{const open=f||!S.collapsed[g.prop]||g.units.some(u=>u.code===S.unit);const n=g.units.reduce((a,u)=>a+(u.count||0),0);
       return `<li class="prop"><button data-prop="${esc(g.prop)}" aria-expanded="${!!open}" aria-current="${!S.unit&&!S.view&&S.prop===g.prop&&g.prop!==""}"><span class="chev" aria-hidden="true">${open?"▾":"▸"}</span><span class="nm">${esc(g.name)}</span><span class="ct">${n}</span></button></li>`+
       (open?g.units.map(u=>`<li class="sub"><button data-unit="${esc(u.code)}" aria-current="${S.unit===u.code}"><span class="code">${esc(u.unitCode||u.code)}</span><span class="nm">${esc(u.name)}</span><span class="ct">${u.count||0}</span></button></li>`).join(""):"")}).join("");
-  $("#unitSelect").innerHTML=`<option value="">All units (${S.units.length})</option><option value="__products" ${S.view==="products"?"selected":""}>Assets</option><option value="__inventories" ${S.view==="inventories"||S.view==="inv-edit"?"selected":""}>Inventories</option><option value="__transfers" ${S.view==="transfers"?"selected":""}>Transfers</option><option value="__reprint" ${S.view==="reprint"?"selected":""}>Labels to reprint (${S.reprint.length})</option>`+groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="__prop:${esc(g.prop)}" ${!S.unit&&!S.view&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("");
+  $("#unitSelect").innerHTML=`<option value="">All units (${S.units.length})</option><option value="__products" ${S.view==="products"?"selected":""}>Assets</option><option value="__inventories" ${S.view==="inventories"||S.view==="inv-edit"?"selected":""}>Inventories</option><option value="__transfers" ${S.view==="transfers"?"selected":""}>Transfers</option><option value="__documents" ${S.view==="documents"?"selected":""}>Documents</option><option value="__reprint" ${S.view==="reprint"?"selected":""}>Labels to reprint (${S.reprint.length})</option>`+groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="__prop:${esc(g.prop)}" ${!S.unit&&!S.view&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("");
 }
 $("#unitList").addEventListener("click",e=>{
   const pb=e.target.closest("button[data-prop]");
@@ -641,6 +646,7 @@ function selectUnit(code,force){
   S.prop=null;
   if(code&&code.startsWith("__prop:")){S.view=null;S.unit=null;S.prop=code.slice(7);S.assets=[];renderUnits();renderView();return}
   if(code==="__reprint"){S.view="reprint";S.unit=null;S.assets=[];renderUnits();renderView();return}
+  if(code==="__documents"){S.view="documents";S.unit=null;S.assets=[];renderUnits();renderView();return}
   if(code==="__transfers"){S.view="transfers";S.unit=null;S.assets=[];S.transfers=null;renderUnits();renderView();return}
   if(code==="__products"||code==="__inventories"){S.view=code==="__products"?"products":"inventories";S.unit=null;S.assets=[];renderUnits();renderView();
     Promise.all([loadCatalog(),loadInvs()]).then(()=>{renderUnits();renderView()});return}
@@ -749,6 +755,7 @@ function renderView(){
   if(S.view==="inv-edit") return renderInvEditor(v);
   if(S.view==="search") return renderSearch(v);
   if(S.view==="transfers") return renderTransfers(v);
+  if(S.view==="documents") return renderDocuments(v);
   if(!S.units.length){
     v.innerHTML=`<div class="empty">
       <span class="eyebrow">Getting started</span>
@@ -809,7 +816,7 @@ function renderUnitView(v){
     <div class="ledger-wrap"><table class="ledger"><thead><tr><th class="chk"><input type="checkbox" id="selAll" aria-label="Select all shown" ${rows.length&&rows.every(r=>S.selected.has(r.tag))?"checked":""}></th><th class="thc"><span class="sr">Photo</span></th><th>Tag</th><th>Item</th><th>Category</th><th>Location</th><th>Status</th><th>Last verified</th></tr></thead>
     <tbody>${rows.map(a=>{const d=daysAgo(a.verifiedAt);return `<tr data-tag="${esc(a.tag)}"><td class="chk"><input type="checkbox" data-sel="${esc(a.tag)}" ${S.selected.has(a.tag)?"checked":""} aria-label="Select ${esc(a.tag)}"></td><td class="thc">${(()=>{const ap=assetPhotos(a);return ap.ids.length?photoImg(ap.ids[0],120,"athumb"+(ap.own?"":" cat")):`<span class="athumb none" aria-hidden="true"></span>`})()}</td><td style="white-space:nowrap"><span class="tagchip">${esc(a.tag)}</span>${a.needsLabel?`<span class="relabel" title="Label ${esc((a.labelIssue||"").toLowerCase())}, needs reprinting">Relabel</span>`:""}</td><td>${esc(a.name)}</td><td class="muted">${esc(a.category)}</td><td>${esc(a.location)}</td><td><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></td><td class="${d===null||d>180?"stale":"muted"} num">${a.verifiedAt?fmtDate(a.verifiedAt):"Never"}</td></tr>`}).join("")||`<tr><td colspan="8" class="muted" style="padding:20px">No assets match these filters.</td></tr>`}</tbody></table></div>`
     : S.assetsLoading?`<div class="empty"><h3>Loading assets…</h3></div>`:`<div class="empty"><h3>No items in ${esc(u.name)} yet</h3><p>Create an inventory for this unit: pick assets (or create new ones), set quantities, then create QR tags. Each item gets a tag like <span class="tagchip">TWC-BRAND-MODEL-0001</span>.</p><div class="actions"><button class="btn primary" data-write onclick="S.invFilter={unit:S.unit,status:''};newInventory()">+ New inventory</button><button class="btn" data-write onclick="openImport()">Import CSV</button></div></div>`}
-    ${S.selected.size?`<div class="selbar"><span><b class="num">${S.selected.size}</b> selected</span><button class="btn primary" id="labelsBtn">Download labels</button><button class="btn" data-write id="bulkXfer">Transfer</button><button class="btn" data-write id="bulkStatus">Set status</button><button class="btn ghost" id="clearSel" style="color:inherit">Clear</button></div>`:""}`;
+    ${S.selected.size?`<div class="selbar"><span><b class="num">${S.selected.size}</b> selected</span><button class="btn primary" id="labelsBtn">Download labels</button><button class="btn" data-write id="bulkXfer">Transfer</button><button class="btn" data-write id="bulkStatus">Set status</button><button class="btn" data-write id="bulkDisp">Dispose</button><button class="btn ghost" id="clearSel" style="color:inherit">Clear</button></div>`:""}`;
   const q=$("#assetSearch");if(q){q.oninput=e=>{S.filter.q=e.target.value;renderView()};if(keepFocus){q.focus();q.setSelectionRange(q.value.length,q.value.length)}}
   const cf=$("#catFilter");if(cf) cf.onchange=e=>{S.filter.cat=e.target.value;renderView()};
   v.querySelectorAll("[data-status]").forEach(b=>b.onclick=()=>{S.filter.status=S.filter.status===b.dataset.status?"":b.dataset.status;renderView()});
@@ -826,7 +833,7 @@ function renderUnitView(v){
   on("labelsBtn",()=>downloadLabels(S.assets.filter(a=>S.selected.has(a.tag))));
   on("stocktakeBtn",openStocktake);
   wireUnitTabs();
-  on("bulkStatus",openBulkStatus);on("bulkXfer",()=>openTransfer(S.assets.filter(a=>S.selected.has(a.tag))));on("clearSel",()=>{S.selected.clear();renderView()});
+  on("bulkStatus",openBulkStatus);on("bulkDisp",()=>openDispose(S.assets.filter(a=>S.selected.has(a.tag))));on("bulkXfer",()=>openTransfer(S.assets.filter(a=>S.selected.has(a.tag))));on("clearSel",()=>{S.selected.clear();renderView()});
   applyWriteGate();
 }
 
@@ -956,9 +963,9 @@ async function openAsset(tag){
   if(!snap.exists){toast(`No tag ${tag} found. Showing search results instead.`);runSearch(tag);return}
   const a=snap.data();
   if(S.view!=="reprint" && S.unit!==a.unit) selectUnit(a.unit);
-  await resolveNames([a.verifiedBy]);
+  await resolveNames([a.verifiedBy,a.disposedBy]);
   showDetail(a);
-  detailUnsubs.push(S.db.doc("assets/"+tag).onSnapshot(async s=>{if(!s.exists||!$("#detail")) return;const d=s.data();await resolveNames([d.verifiedBy]);if($("#detail")) showDetail(d,true)}));
+  detailUnsubs.push(S.db.doc("assets/"+tag).onSnapshot(async s=>{if(!s.exists||!$("#detail")) return;const d=s.data();await resolveNames([d.verifiedBy,d.disposedBy]);if($("#detail")) showDetail(d,true)}));
   detailUnsubs.push(S.db.collection("assets/"+tag+"/log").orderBy("at","desc").limit(25).onSnapshot(async s=>{
     const items=s.docs.map(d=>d.data());await resolveNames(items.map(i=>i.by));
     const el=$("#logList");if(el) el.innerHTML=items.map(i=>`<li><time>${fmtDT(i.at)}</time><span>${esc(i.text)} <span class="muted">· ${esc(nameOf(i.by))}</span></span></li>`).join("")||`<li class="muted">No history yet.</li>`;
@@ -969,10 +976,10 @@ function showDetail(a,update){
   const d=daysAgo(a.verifiedAt);
   const html=`<div class="sheet" id="detail" role="dialog" aria-label="Asset ${esc(a.tag)}">
     <div class="sheet-head"><div><span class="eyebrow">${esc(unitLabel(a.unit))}</span><h3>${esc(a.name)}</h3></div><button class="btn ghost" data-close aria-label="Close">✕</button></div>
-    <div class="label-card"><div class="qr">${qrSvg(qrPayload(a.tag))}</div><div><div class="big">${esc(a.tag)}</div><div class="muted" style="font-size:13px">${esc(a.category)}</div><div style="margin-top:6px"><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></div></div></div>
+    <div class="label-card${a.status==="Disposed"?" void":""}"><div class="qr">${qrSvg(qrPayload(a.tag))}</div><div><div class="big">${esc(a.tag)}</div><div class="muted" style="font-size:13px">${esc(a.category)}</div><div style="margin-top:6px"><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></div></div></div>
     ${(()=>{const ap=assetPhotos(a);return ap.ids.length?`<div id="aGal">${photoGallery(ap.ids,ap.own?"":`General photo of ${esc(ap.product.name)}. Add a photo of this piece to show its actual condition.`)}</div>`:""})()}
     <div class="verify"><div><b>Last verified</b><div class="${d===null||d>180?"stale":"muted"}" style="font-size:13px">${a.verifiedAt?`${fmtDate(a.verifiedAt)} (${d===0?"today":d+" days ago"})${a.verifiedBy?" by "+esc(nameOf(a.verifiedBy)):""}`:"Never"}</div></div>
-      <button class="btn primary" data-write id="verifyBtn">Confirm it's here</button></div>
+      ${a.status==="Disposed"?"":`<button class="btn primary" data-write id="verifyBtn">Confirm it's here</button>`}</div>
     <dl class="facts">
       <dt>Location</dt><dd>${esc(a.location)||"<span class='muted'>Not set</span>"}</dd>
       <dt>Condition</dt><dd>${esc(a.condition)}</dd>
@@ -982,13 +989,14 @@ function showDetail(a,update){
       ${a.cost?`<dt>Cost</dt><dd class="num">${esc(a.cost)}</dd>`:""}
       ${a.notes?`<dt>Notes</dt><dd style="white-space:pre-wrap">${esc(a.notes)}</dd>`:""}
     </dl>
+    ${a.status==="Disposed"?`<div class="flag"><div><b>QR label deactivated: item disposed${a.disposalMethod?" ("+esc(a.disposalMethod)+")":""}</b><div class="muted" style="font-size:13px">${[a.disposedOn?fmtDate(Date.parse(a.disposedOn+"T00:00:00")):"",a.disposedBy?"by "+esc(nameOf(a.disposedBy)):"",a.disposalNote?esc(a.disposalNote):""].filter(Boolean).join(" · ")||"No disposal details recorded"}</div><div style="font-size:13px;margin-top:4px">If you find this item or its label, remove the label. Undo disposal to reactivate it.</div></div></div>`:""}
     ${a.needsLabel?`<div class="flag"><div><b>Label ${esc((a.labelIssue||"damaged").toLowerCase())}</b><div class="muted" style="font-size:13px">Reported ${esc(fmtDate(a.labelReportedAt))}${a.labelReportedBy?" by "+esc(nameOf(a.labelReportedBy)):""}${a.labelNote?" · "+esc(a.labelNote):""}</div></div><button class="btn" data-write id="relabelledBtn">New label attached</button></div>`:""}
-    <div class="actions"><button class="btn primary" data-write id="xferBtn">Transfer</button><button class="btn" data-write id="editBtn">Edit</button>${S.assetsCap?`<label class="btn" data-write id="qPhotoBtn">Add photo<input type="file" id="qPhoto" accept="image/\x2a" capture="environment" hidden></label>`:""}<button class="btn" id="oneLabel">Download label</button>${a.needsLabel?"":`<button class="btn" data-write id="reportLabel">Report label problem</button>`}<button class="btn danger" data-write id="delBtn">Delete</button></div>
+    ${a.status==="Disposed"?`<div class="actions"><button class="btn primary" data-write id="undoDispBtn">Undo disposal</button><button class="btn ghost danger" data-write id="delBtn">Delete</button></div>`:""}<div class="actions"${a.status==="Disposed"?" hidden":""}><button class="btn primary" data-write id="xferBtn">Transfer</button><button class="btn" data-write id="editBtn">Edit</button>${S.assetsCap?`<label class="btn" data-write id="qPhotoBtn">Add photo<input type="file" id="qPhoto" accept="image/\x2a" capture="environment" hidden></label>`:""}<button class="btn" id="oneLabel">Download label</button>${a.needsLabel?"":`<button class="btn" data-write id="reportLabel">Report label problem</button>`}${a.status==="Disposed"?"":`<button class="btn danger" data-write id="dispBtn">Dispose</button><button class="btn ghost danger" data-write id="delBtn">Delete</button>`}</div>
     <div><span class="eyebrow">History</span><ul class="log" id="logList" style="margin-top:8px"><li class="muted">Loading…</li></ul></div>
   </div>`;
   if(update){const keep=$("#logList")?.innerHTML;$("#overlay").firstElementChild.innerHTML=html;if(keep) $("#logList").innerHTML=keep}
   else {closeOverlay();$("#overlay").innerHTML=`<div class="scrim" data-scrim>${html}</div>`}
-  $("#verifyBtn").onclick=async()=>{try{await S.db.doc("assets/"+a.tag).update({verifiedAt:Date.now(),verifiedBy:S.me||null});await logEvent(a.tag,"Verified on site"+(a.location?" at "+a.location:""));toast(`${a.tag} verified`)}catch(e){writeErr(e)}};
+  if($("#verifyBtn")) $("#verifyBtn").onclick=async()=>{try{await S.db.doc("assets/"+a.tag).update({verifiedAt:Date.now(),verifiedBy:S.me||null});await logEvent(a.tag,"Verified on site"+(a.location?" at "+a.location:""));toast(`${a.tag} verified`)}catch(e){writeErr(e)}};
   $("#editBtn").onclick=()=>openAssetForm(a);
   $("#xferBtn").onclick=()=>openTransfer([a]);
   $("#oneLabel").onclick=()=>downloadLabels([a]);
@@ -1003,26 +1011,169 @@ function showDetail(a,update){
     catch(err){console.error(err);toast(err&&err.message?err.message:"The photo couldn't be added.")} finally{const l=$("#qPhotoBtn");if(l) l.firstChild.textContent="Add photo"}
   };
   $("#delBtn").onclick=()=>confirmDelete(a);
+  const dpb=$("#dispBtn");if(dpb) dpb.onclick=()=>openDispose([a]);
+  const udb=$("#undoDispBtn");if(udb) udb.onclick=()=>undoDispose(a);
   const rl=$("#reportLabel");if(rl) rl.onclick=()=>openReportLabel(a);
   const rd=$("#relabelledBtn");if(rd) rd.onclick=()=>markRelabelled([a]);
   applyWriteGate();
   try{history.replaceState(null,"","#"+a.tag)}catch(e){}
 }
 function confirmDelete(a){
-  modal(`<h3>Delete ${esc(a.tag)}?</h3><p style="margin:0">This removes <b>${esc(a.name)}</b> from the register. If the item was sold or thrown away, setting its status to <b>Disposed</b> keeps the record instead.</p>
-   <div class="row-end"><button class="btn" data-close>Keep it</button><button class="btn primary" id="markDisp">Mark disposed</button><button class="btn danger" id="reallyDel">Delete</button></div>`,true);
-  $("#markDisp").onclick=async()=>{try{await S.db.doc("assets/"+a.tag).update({status:"Disposed",updatedAt:Date.now(),updatedBy:S.me||null});await statusCountChange(a.unit,a.status,"Disposed");await logEvent(a.tag,`Status ${a.status} → Disposed`);closeOverlay();toast(`${a.tag} marked disposed`)}catch(e){writeErr(e)}};
+  modal(`<h3>Delete ${esc(a.tag)}?</h3><p style="margin:0">This removes <b>${esc(a.name)}</b> from the register. Only delete records made by mistake. If the item was sold, thrown away or donated, use <b>Dispose</b> instead: it keeps the record and its history.</p>
+   <div class="row-end"><button class="btn" data-close>Keep it</button><button class="btn primary" id="markDisp">Dispose instead</button><button class="btn danger" id="reallyDel">Delete</button></div>`,true);
+  $("#markDisp").onclick=()=>openDispose([a]);
   $("#reallyDel").onclick=async()=>{try{await S.db.doc("assets/"+a.tag).delete();if(a.status!=="Disposed") await bumpUnit(a.unit,0,-1);allItemsCache=null;
     if(S.assetsCap) for(const ph of a.photos||[]){try{await S.assetsCap.delete(ph)}catch(e){}}
     closeOverlay();toast(`${a.tag} deleted`)}catch(e){writeErr(e)}};
 }
 
+/* ---------- Disposal ---------- */
+const DISPOSAL_METHODS=["Sold","Thrown away / scrapped","Donated","Returned to vendor","Recycled","Written off (lost or stolen)","Other"];
+function openDispose(items){
+  items=(items||[]).filter(a=>a&&a.status!=="Disposed");
+  if(!items.length){toast("Those items are already disposed");return}
+  const one=items.length===1;
+  modal(`<h3>Dispose ${one?esc(items[0].tag):items.length+" items"}</h3>
+   ${one?`<p style="margin:0">${esc(items[0].name)} <span class="muted">· ${esc(unitLabel(items[0].unit))}</span></p>`
+     :`<ul class="report-list" style="max-height:140px;overflow:auto">${items.slice(0,12).map(a=>`<li><span class="tagchip">${esc(a.tag)}</span> ${esc(a.name)}</li>`).join("")}${items.length>12?`<li class="muted">and ${items.length-12} more</li>`:""}</ul>`}
+   <div class="field"><label for="dpHow">How was it disposed? <span class="req">*</span></label><select id="dpHow"><option value="">Choose one</option>${DISPOSAL_METHODS.map(m=>`<option>${esc(m)}</option>`).join("")}</select></div>
+   <div class="field"><label for="dpDate">Date disposed</label><input id="dpDate" type="date" value="${localDay()}" max="${localDay()}"></div>
+   <div class="field"><label for="dpNote">Reason or note</label><input id="dpNote" placeholder="e.g. Broken frame, sold to staff for SGD 20, approved by facilities"></div>
+   <p class="hint" style="margin:0">${one?"The item stays":"The items stay"} in the register with full history, marked Disposed. Disposed items no longer count in the unit, stock or stocktakes. Its QR label is deactivated: scanning it shows the item as disposed, and it can't be transferred, verified or reprinted. You can undo this later.</p>
+   <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn danger" id="dpGo" disabled>Dispose</button></div>`);
+  const how=$("#dpHow"),go=$("#dpGo");
+  how.onchange=()=>{go.disabled=!how.value;go.textContent=one?"Dispose":`Dispose ${items.length} items`};
+  go.onclick=async()=>{
+    const method=how.value,date=$("#dpDate").value||localDay(),note=$("#dpNote").value.trim();if(!method) return;
+    go.disabled=true;go.textContent="Disposing…";let n=0;
+    try{
+      for(const a of items){
+        const cur=(await S.db.doc("assets/"+a.tag).get()).data();if(!cur||cur.status==="Disposed") continue;
+        const now=Date.now();
+        await S.db.doc("assets/"+a.tag).update({status:"Disposed",disposedFrom:cur.status,disposalMethod:method,disposedOn:date,disposalNote:note,disposedAt:now,disposedBy:S.me||null,needsLabel:false,updatedAt:now,updatedBy:S.me||null});
+        await statusCountChange(cur.unit,cur.status,"Disposed");
+        await logEvent(a.tag,`Disposed (${method})${date!==localDay()?" on "+fmtDate(Date.parse(date+"T00:00:00")):""}${note?" · "+note:""}`);
+        n++;if(!one) go.textContent=`Disposing ${n} of ${items.length}…`;
+      }
+      S.selected.clear();closeOverlay();toast(one?`${items[0].tag} disposed`:`${n} items disposed`);
+      if(one) setTimeout(()=>openAsset(items[0].tag),300);else renderView();
+    }catch(e){go.disabled=false;go.textContent="Try again";writeErr(e)}
+  };
+}
+function undoDispose(a){
+  const to=a.disposedFrom&&a.disposedFrom!=="Disposed"?a.disposedFrom:"In use";
+  modal(`<h3>Undo disposal of ${esc(a.tag)}?</h3><p style="margin:0">${esc(a.name)} goes back to <b>${esc(to)}</b> in ${esc(unitLabel(a.unit))}. Its QR label works again. The disposal stays in its history.</p>
+   <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="udGo">Undo disposal</button></div>`);
+  $("#udGo").onclick=async()=>{const b=$("#udGo");b.disabled=true;
+    try{await S.db.doc("assets/"+a.tag).update({status:to,disposedFrom:"",disposalMethod:"",disposedOn:"",disposalNote:"",disposedAt:null,disposedBy:null,updatedAt:Date.now(),updatedBy:S.me||null});
+      await statusCountChange(a.unit,"Disposed",to);await logEvent(a.tag,`Disposal undone · back to ${to}`);
+      closeOverlay();toast(`${a.tag} restored`);setTimeout(()=>openAsset(a.tag),300)}
+    catch(e){b.disabled=false;writeErr(e)}};
+}
 function openBulkStatus(){
   modal(`<h3>Set status for ${S.selected.size} assets</h3><div class="field"><label for="bs">Status</label><select id="bs">${STATUSES.map(s=>`<option>${s.v}</option>`).join("")}</select></div>
    <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="bsGo">Apply</button></div>`);
   $("#bsGo").onclick=async()=>{const st=$("#bs").value;const b=$("#bsGo");b.disabled=true;
     try{for(const tag of S.selected){const a=S.assets.find(x=>x.tag===tag);if(!a||a.status===st) continue;await S.db.doc("assets/"+tag).update({status:st,updatedAt:Date.now(),updatedBy:S.me||null});await statusCountChange(a.unit,a.status,st);await logEvent(tag,`Status ${a.status} → ${st}`)}
       closeOverlay();toast("Status updated");S.selected.clear();renderView()}catch(e){b.disabled=false;writeErr(e)}};
+}
+
+/* ---------- Documents (PO, DO, invoices) ---------- */
+const DOC_TYPES=["Purchase order (PO)","Delivery order (DO)","Invoice","Quotation","Warranty","Receipt","Other"];
+const docShort=t=>({"Purchase order (PO)":"PO","Delivery order (DO)":"DO"})[t]||t||"Doc";
+const docUrl=f=>"https://drive.google.com/file/d/"+encodeURIComponent(f.id)+"/view";
+const docDate=d=>d&&d.date?fmtDate(Date.parse(d.date+"T00:00:00")):"";
+const fileChips=fs=>(fs||[]).map(f=>`<a class="docfile" href="${esc(docUrl(f))}" target="_blank" rel="noopener" title="${esc(f.name)}">${/pdf/i.test((f.mime||"")+f.name)?"PDF":/^image/i.test(f.mime||"")?"IMG":"FILE"} · ${esc(f.name)}</a>`).join("");
+function docsFor(pred){return (S.docs||[]).filter(pred).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||String(b.id).localeCompare(String(a.id)))}
+function renderDocuments(v){
+  if(!S.docs){v.innerHTML=`<div class="empty"><h3>Loading documents…</h3></div>`;return}
+  const f=S.docFilter=S.docFilter||{q:"",type:"",unit:""},q=f.q.toLowerCase();
+  const inScope=d=>!f.unit||(f.unit.startsWith("P:")?!!d.unit&&(S.units.find(u=>u.code===d.unit)||{}).property===f.unit.slice(2):d.unit===f.unit);
+  const rows=docsFor(d=>(!f.type||d.type===f.type)&&inScope(d)&&(!q||[d.id,d.type,d.number,d.vendor,d.notes,d.inventory,d.unit?unitLabel(d.unit):"",...(d.files||[]).map(x=>x.name)].join(" ").toLowerCase().includes(q)));
+  const keep=document.activeElement?.id==="docQ";
+  v.innerHTML=`<div class="pagehead"><div><h2>Documents</h2><div class="sub">Purchase orders, delivery orders, invoices and other paperwork, linked to units and inventories. <span class="num">${rows.length}</span> document${rows.length===1?"":"s"}</div></div>
+    <div class="actions"><button class="btn primary" data-write id="docNew">+ Upload document</button></div></div>
+    <div class="toolbar"><input id="docQ" placeholder="Search number, vendor, file name" value="${esc(f.q)}" aria-label="Search documents">
+      <select id="docType" aria-label="Type"><option value="">All types</option>${DOC_TYPES.map(t=>`<option ${f.type===t?"selected":""}>${esc(t)}</option>`).join("")}</select>
+      <select id="docUnit" aria-label="Property or unit"><option value="">All properties and units</option>${groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="P:${esc(g.prop)}" ${f.unit==="P:"+g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${f.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
+    ${rows.length?`<div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Type</th><th>Number</th><th>Vendor</th><th>Unit</th><th>Inventory</th><th style="text-align:right">Amount</th><th>Files</th></tr></thead><tbody>
+      ${rows.map(d=>`<tr data-doc="${esc(d.id)}"><td class="muted num" style="white-space:nowrap">${esc(docDate(d))}</td><td><span class="pill s-storage">${esc(docShort(d.type))}</span></td><td><b>${esc(d.number||d.id)}</b>${d.notes?`<div class="muted" style="font-size:12.5px">${esc(d.notes)}</div>`:""}</td><td>${esc(d.vendor||"")}</td><td>${d.unit?esc(unitLabel(d.unit)):`<span class="muted">—</span>`}</td><td>${d.inventory?`<span class="tagchip">${esc(d.inventory)}</span>`:""}</td><td class="num" style="text-align:right;white-space:nowrap">${d.amount!==""&&d.amount!=null?money(d.amount):""}</td><td>${fileChips(d.files)}</td></tr>`).join("")}
+    </tbody></table></div>`:`<div class="empty"><h3>${S.docs.length?"No documents match":"No documents yet"}</h3><p>Upload purchase orders, delivery orders, invoices or warranties as a PDF or a photo. Link each one to a unit and inventory so it's easy to find for audits and move-outs.</p></div>`}`;
+  const qi=$("#docQ");qi.oninput=e=>{f.q=e.target.value;renderView()};if(keep){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length)}
+  $("#docType").onchange=e=>{f.type=e.target.value;renderView()};$("#docUnit").onchange=e=>{f.unit=e.target.value;renderView()};
+  $("#docNew").onclick=()=>openDocForm(null,{unit:f.unit&&!f.unit.startsWith("P:")?f.unit:""});
+  v.querySelector("tbody")?.addEventListener("click",e=>{if(e.target.closest("a")) return;const r=e.target.closest("tr[data-doc]");if(r) openDocForm(S.docs.find(x=>x.id===r.dataset.doc))});
+  applyWriteGate();
+}
+function openDocForm(doc,pre){
+  const isNew=!doc;pre=pre||{};
+  const d=doc?JSON.parse(JSON.stringify(doc)):{type:pre.type||"Purchase order (PO)",number:"",date:localDay(),vendor:"",unit:pre.unit||"",inventory:pre.inventory||"",amount:"",notes:"",files:[]};
+  const files=[...(d.files||[])],removed=[],picked=[];
+  const invOpts=u=>(S.invs||[]).filter(i=>!u||i.unit===u).sort((a,b)=>b.id.localeCompare(a.id)).map(i=>`<option value="${esc(i.id)}" ${d.inventory===i.id?"selected":""}>${esc(i.id)} · ${esc(i.name)}${u?"":" · "+esc(unitLabel(i.unit))}</option>`).join("");
+  modal(`<h3>${isNew?"Upload document":"Document "+esc(d.id)}</h3>
+   <form class="grid" id="dcf">
+    <div class="field"><label for="dc-type">Type</label><select id="dc-type">${DOC_TYPES.map(t=>`<option ${d.type===t?"selected":""}>${esc(t)}</option>`).join("")}</select></div>
+    <div class="field"><label for="dc-no">Document number</label><input id="dc-no" value="${esc(d.number)}" placeholder="e.g. PO-2026-0153"></div>
+    <div class="field"><label for="dc-date">Date</label><input id="dc-date" type="date" value="${esc(d.date)}"></div>
+    <div class="field"><label for="dc-vendor">Vendor</label><input id="dc-vendor" list="dl-dcven" value="${esc(d.vendor)}"><datalist id="dl-dcven">${(S.cat?S.cat.vendors:[]).map(x=>`<option value="${esc(x.name)}">`).join("")}</datalist></div>
+    <div class="field"><label for="dc-unit">Unit</label><select id="dc-unit"><option value="">Not linked to a unit</option>${unitOptions(d.unit)}</select></div>
+    <div class="field"><label for="dc-inv">Inventory</label><select id="dc-inv"><option value="">Not linked</option>${invOpts(d.unit)}</select></div>
+    <div class="field"><label for="dc-amt">Amount (${esc(S.cat?S.cat.currency:"SGD")})</label><input id="dc-amt" inputmode="decimal" value="${esc(d.amount)}" placeholder="Optional"></div>
+    <div class="field"><label for="dc-notes">Notes</label><input id="dc-notes" value="${esc(d.notes)}" placeholder="e.g. 20 task chairs for level 3"></div>
+    <div class="field full"><span class="flabel">Files <span class="hint">(PDF, photo, Word or Excel, up to 15 MB each)</span></span>
+      <div id="dcFiles"></div>
+      <div class="actions"><label class="btn" data-write>+ Add files<input type="file" id="dcInput" multiple accept=".pdf,image/\x2a,.doc,.docx,.xls,.xlsx,.csv" hidden></label>
+      <label class="btn" data-write>Take photo<input type="file" id="dcCamIn" accept="image/\x2a" capture="environment" hidden></label></div>
+      <span class="hint" id="dcStatus"></span></div>
+    <div class="row-end full">${isNew?"":`<button class="btn ghost danger" type="button" data-write id="dcDel" style="margin-right:auto">Delete</button>`}<button class="btn" type="button" data-close>Cancel</button><button class="btn primary" type="submit" data-write id="dcSave">${isNew?"Upload":"Save"}</button></div>
+   </form>`);
+  const draw=()=>{$("#dcFiles").innerHTML=[...files.map((f,i)=>`<div class="docrow">${fileChips([f])}<button type="button" class="btn ghost" data-rmf="${i}" aria-label="Remove ${esc(f.name)}">✕</button></div>`),
+    ...picked.map((f,i)=>`<div class="docrow"><span class="docfile new">${esc(f.name)} · ${Math.max(1,Math.round(f.size/1024)).toLocaleString()} KB</span><button type="button" class="btn ghost" data-rmp="${i}" aria-label="Remove ${esc(f.name)}">✕</button></div>`)].join("")
+    ||`<p class="muted" style="margin:0 0 8px;font-size:13px">No files added yet.</p>`};
+  draw();
+  $("#dcFiles").onclick=e=>{const a=e.target.closest("[data-rmf]"),b=e.target.closest("[data-rmp]");if(a){removed.push(...files.splice(+a.dataset.rmf,1));draw()}if(b){picked.splice(+b.dataset.rmp,1);draw()}};
+  const addPicked=e=>{const fs=[...e.target.files];e.target.value="";const big=fs.filter(f=>f.size>15*1024*1024);
+    if(big.length) toast(`${big.map(f=>f.name).join(", ")} ${big.length===1?"is":"are"} over 15 MB, please use a smaller file`);picked.push(...fs.filter(f=>f.size<=15*1024*1024));draw()};
+  $("#dcInput").onchange=addPicked;$("#dcCamIn").onchange=addPicked;
+  $("#dc-unit").onchange=()=>{d.inventory=$("#dc-inv").value;$("#dc-inv").innerHTML=`<option value="">Not linked</option>${invOpts($("#dc-unit").value)}`};
+  $("#dc-inv").onchange=e=>{const i=(S.invs||[]).find(x=>x.id===e.target.value);if(i&&!$("#dc-unit").value){$("#dc-unit").value=i.unit;d.inventory=i.id;$("#dc-inv").innerHTML=`<option value="">Not linked</option>${invOpts(i.unit)}`}};
+  $("#dcf").onsubmit=async e=>{e.preventDefault();
+    if(!files.length&&!picked.length){toast("Add the PDF or a photo of the document first");return}
+    if(!window.uploadDocFile){toast("Document upload isn't available in this view");return}
+    const b=$("#dcSave");b.disabled=true;
+    try{
+      const up=[];
+      for(let i=0;i<picked.length;i++){$("#dcStatus").textContent=`Uploading ${i+1} of ${picked.length}…`;const r=await window.uploadDocFile(picked[i]);
+        up.push({id:r.id,name:r.name||picked[i].name,mime:picked[i].type||"",size:picked[i].size})}
+      $("#dcStatus").textContent="Saving…";
+      let id=d.id;
+      if(!id){let n=(S.docs||[]).reduce((m,x)=>Math.max(m,+((String(x.id).match(/(\d+)$/)||[0,0])[1])),0)+1;
+        for(;;n++){id="DOC-"+pad4(n);if(!(await S.db.doc("documents/"+id).get()).exists) break}}
+      const now=Date.now(),g=k=>$("#"+k).value.trim();
+      const rec={id,type:g("dc-type"),number:g("dc-no").slice(0,100),date:g("dc-date"),vendor:g("dc-vendor").slice(0,200),unit:g("dc-unit"),inventory:g("dc-inv"),
+        amount:g("dc-amt")===""?"":num(g("dc-amt")),notes:g("dc-notes").slice(0,1000),files:[...files,...up].slice(0,20),
+        createdAt:d.createdAt||now,createdBy:d.createdBy||S.me||null,updatedAt:now,updatedBy:S.me||null};
+      await S.db.doc("documents/"+id).set(rec);
+      for(const f of removed){try{await window.deleteDocFile(f.id)}catch(err){}}
+      closeOverlay();toast(isNew?`${docShort(rec.type)} ${rec.number||id} uploaded`:"Document saved");
+    }catch(err){b.disabled=false;$("#dcStatus").textContent="";writeErr(err)}
+  };
+  const del=$("#dcDel");if(del) del.onclick=async()=>{
+    if(!del.dataset.armed){del.dataset.armed="1";del.textContent="Confirm delete";return}
+    del.disabled=true;
+    try{await S.db.doc("documents/"+d.id).delete();for(const f of d.files||[]){try{await window.deleteDocFile(f.id)}catch(err){}}closeOverlay();toast("Document deleted")}
+    catch(err){del.disabled=false;writeErr(err)}};
+  applyWriteGate();
+}
+function invDocsHtml(id){
+  const ds=docsFor(d=>d.inventory===id);
+  return `<section class="panel"><div class="pagehead" style="margin:0"><h3 class="h3" style="margin:0">Documents</h3><div class="actions"><button class="btn" data-write id="ieDocAdd">+ Attach PO / DO</button></div></div>
+   ${ds.length?`<ul class="log" style="margin-top:8px">${ds.map(d=>`<li><span><span class="pill s-storage">${esc(docShort(d.type))}</span> <b>${esc(d.number||d.id)}</b> <span class="muted">${esc([docDate(d),d.vendor].filter(Boolean).join(" · "))}</span> <button type="button" class="linkback" data-doc="${esc(d.id)}" style="margin:0;color:var(--accent)">Edit</button><br>${fileChips(d.files)}</span></li>`).join("")}</ul>`
+     :`<p class="muted" style="margin:8px 0 0;font-size:14px">No PO, DO or invoice attached yet.</p>`}</section>`;
+}
+function wireInvDocs(inv){
+  const b=$("#ieDocAdd");if(b) b.onclick=()=>openDocForm(null,{unit:inv.unit,inventory:inv.id});
+  document.querySelectorAll("#view [data-doc]").forEach(x=>x.onclick=()=>openDocForm((S.docs||[]).find(d=>d.id===x.dataset.doc)));
 }
 
 /* ---------- Names ---------- */
@@ -1195,7 +1346,7 @@ async function buildReport(scope,incDisposed,status){
     {header:"Status",key:"status",width:13},{header:"Condition",key:"condition",width:11},{header:"Serial / model no.",key:"serial",width:20},
     {header:"Purchase date",key:"purchased",width:14,style:{numFmt:DATE}},{header:"Cost",key:"cost",width:12,style:{numFmt:MONEY}},
     {header:"Notes",key:"notes",width:36},{header:"Last verified",key:"verified",width:14,style:{numFmt:DATE}},
-    {header:"Verified by",key:"vby",width:20},{header:"Days since verified",key:"days",width:11},{header:"Label",key:"label",width:12},
+    {header:"Verified by",key:"vby",width:20},{header:"Days since verified",key:"days",width:11},{header:"Label",key:"label",width:12},{header:"Disposed on",key:"dispOn",width:13,style:{numFmt:DATE}},{header:"Disposal method",key:"dispHow",width:18},{header:"Disposal note",key:"dispNote",width:28},
     {header:"Added to register",key:"created",width:14,style:{numFmt:DATE}},{header:"Last updated",key:"updated",width:14,style:{numFmt:DATE}},
     {header:"Last updated by",key:"uby",width:20},{header:"Photos",key:"nph",width:8},{header:"Photo",key:"photo",width:14}];
   styleHead(al.getRow(1));
@@ -1206,7 +1357,7 @@ async function buildReport(scope,incDisposed,status){
   for(const a of assets){
     const r=al.addRow({prop:propName(propOfUnit(a.unit)),unit:a.unit,uname:(S.units.find(u=>u.code===a.unit)||{}).name||a.unit,tag:a.tag,name:a.name,category:a.category,location:a.location,status:a.status,condition:a.condition,
       serial:a.serial,purchased:pDate(a.purchased),cost:money(a.cost),notes:a.notes,verified:toDate(a.verifiedAt),vby:who(a.verifiedBy),
-      days:a.verifiedAt?daysAgo(a.verifiedAt):null,label:a.needsLabel?(a.labelIssue||"Damaged"):"OK",created:toDate(a.createdAt),updated:toDate(a.updatedAt),uby:who(a.updatedBy)});
+      days:a.verifiedAt?daysAgo(a.verifiedAt):null,label:a.needsLabel?(a.labelIssue||"Damaged"):"OK",dispOn:pDate(a.disposedOn),dispHow:a.disposalMethod||"",dispNote:a.disposalNote||"",created:toDate(a.createdAt),updated:toDate(a.updatedAt),uby:who(a.updatedBy)});
     const f=STATUS_FILL[a.status];if(f) r.getCell("status").fill={type:"pattern",pattern:"solid",fgColor:{argb:f}};
     if(a.needsLabel) r.getCell("label").font={color:{argb:"FF9A6A00"},bold:true};
     if(stale(a)) r.getCell("verified").font={color:{argb:"FF9A6A00"}};
@@ -1294,6 +1445,20 @@ async function buildReport(scope,incDisposed,status){
   if(tfN) tf.autoFilter={from:{row:1,column:1},to:{row:tfN+1,column:11}};else tf.addRow({tag:"No transfers for this scope yet."});
   tf.views=[{state:"frozen",ySplit:1}];
 
+  // Documents
+  const docsIn=(S.docs||[]).filter(d=>!scope||(d.unit&&unitSet.has(d.unit))||(d.inventory&&invsIn.some(i=>i.id===d.inventory)));
+  const dsh=wb.addWorksheet("Documents");
+  dsh.columns=[{header:"Doc ID",key:"id",width:11},{header:"Type",key:"type",width:20},{header:"Number",key:"no",width:18},{header:"Date",key:"date",width:12,style:{numFmt:DATE}},
+    {header:"Vendor",key:"vendor",width:22},{header:"Property",key:"prop",width:18},{header:"Unit",key:"unit",width:22},{header:"Inventory",key:"inv",width:12},
+    {header:`Amount (${CURRENCY})`,key:"amt",width:14,style:{numFmt:MONEY}},{header:"Notes",key:"notes",width:32},{header:"Files",key:"files",width:48}];
+  styleHead(dsh.getRow(1));
+  [...docsIn].sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).forEach(d=>{
+    const r=dsh.addRow({id:d.id,type:d.type,no:d.number,date:pDate(d.date),vendor:d.vendor,prop:d.unit?propName(propOfUnit(d.unit)):"",unit:d.unit?unitLabel(d.unit):"",inv:d.inventory||"",
+      amt:d.amount===""||d.amount==null?null:+d.amount,notes:d.notes,files:(d.files||[]).map(x=>x.name).join(", ")});
+    const f0=(d.files||[])[0];if(f0){r.getCell("files").value={text:(d.files||[]).map(x=>x.name).join(", "),hyperlink:docUrl(f0)};r.getCell("files").font={color:{argb:"FF2F6FD0"},underline:true}}});
+  if(docsIn.length) dsh.autoFilter={from:{row:1,column:1},to:{row:docsIn.length+1,column:11}};else dsh.addRow({id:"No documents for this scope yet."});
+  dsh.views=[{state:"frozen",ySplit:1}];
+
   // Product catalogue, with each product's main photo embedded in the sheet.
   const pc=wb.addWorksheet("Assets");
   pc.columns=[{header:"Photo",key:"photo",width:14},{header:"Asset ID",key:"pid",width:10},{header:"Asset name",key:"name",width:30},{header:"Category",key:"category",width:14},
@@ -1328,7 +1493,8 @@ async function buildReport(scope,incDisposed,status){
 
 /* ---------- Label sheet ---------- */
 async function downloadLabels(list){
-  if(!list.length) return;
+  list=(list||[]).filter(a=>a&&a.status!=="Disposed");
+  if(!list.length){toast("No labels to download: disposed items' labels are deactivated");return}
   if(!S.dl){toast("Downloads aren't available in this view");return}
   const cells=list.map(a=>`<div class="lbl"><div class="q">${qrSvg(qrPayload(a.tag))}</div><div class="t"><div class="tag">${esc(a.tag)}</div><div class="nm">${esc(a.name)}</div><div class="u">${esc(unitLabel(a.unit))}</div><div class="p">Company property · scan to view</div></div></div>`).join("");
   const doc=`<!doctype html><html><head><meta charset="utf-8"><title>Asset labels</title><style>
@@ -1369,7 +1535,7 @@ async function transferItems(tags,to,location,note){
   return moved;
 }
 function openTransfer(items){
-  items=(items||[]).filter(Boolean);if(!items.length) return;
+  items=(items||[]).filter(a=>a&&a.status!=="Disposed");if(!items.length){toast("Disposed items can't be transferred");return}
   const froms=[...new Set(items.map(a=>a.unit))];
   modal(`<h3>Transfer ${items.length===1?esc(items[0].tag):items.length+" items"}</h3>
    <ul class="report-list" style="max-height:140px;overflow:auto">${items.slice(0,12).map(a=>`<li><span class="tagchip">${esc(a.tag)}</span> ${esc(a.name)} <span class="muted">· now in ${esc(unitLabel(a.unit))}</span></li>`).join("")}${items.length>12?`<li class="muted">and ${items.length-12} more</li>`:""}</ul>
@@ -1685,6 +1851,7 @@ function openStocktake(){
       const snap=await S.db.doc("assets/"+tag).get();
       if(!snap.exists){st.entries.unshift({time,tag,cls:"bad",text:"is not in the register"});return}
       const a=snap.data();
+      if(a.status==="Disposed"){st.entries.unshift({time,tag,cls:"bad",text:"was disposed"+(a.disposedOn?" on "+fmtDate(Date.parse(a.disposedOn+"T00:00:00")):"")+" · this label is deactivated, please remove it"});return}
       await S.db.doc("assets/"+tag).update({verifiedAt:Date.now(),verifiedBy:S.me||null,...(a.status==="Missing"?{status:"In use"}:{})});
       await logEvent(tag,`Verified in stocktake${a.status==="Missing"?" (was Missing)":""}`);
       st.found.add(tag);
@@ -2204,6 +2371,7 @@ function renderInvEditor(v){
       <div class="field"><label for="ie-status">Status</label><select id="ie-status">${INV_STATUSES.map(s=>`<option ${inv.status===s?"selected":""}>${s}</option>`).join("")}</select></div>
       <div class="field span3"><label for="ie-notes">Notes</label><input id="ie-notes" value="${esc(inv.notes)}" placeholder="PO number, delivery date, who requested it…"></div>
     </div></section>
+    ${saved?invDocsHtml(inv.id):""}
     <div class="pagehead" style="margin-top:4px"><h3 class="h3">Assets</h3><div class="actions"><button class="btn primary" data-write id="ieAdd">+ Add assets</button><button class="btn" data-write id="ieNewAsset">+ New asset</button></div></div>
     ${E.lines.length?`<div class="ledger-wrap"><table class="ledger lines"><thead><tr><th>Asset</th><th style="width:96px">Qty</th><th>Location</th><th>Notes</th><th style="text-align:right">Line value</th><th>Tagged</th><th></th></tr></thead><tbody>
       ${E.lines.map((l,i)=>{const p=prodById(l.productId)||{name:"(deleted asset)",price:0,photos:[]};const tg=l.tagged||0;
@@ -2229,6 +2397,7 @@ function renderInvEditor(v){
     tb.addEventListener("click",e=>{const b=e.target.closest("[data-rm]");if(!b) return;E.lines.splice(+b.dataset.rm,1);S.dirty=true;renderView()});
   }
   $("#ieBack").onclick=()=>selectUnit("__inventories");
+  wireInvDocs(inv);
   $("#ieAdd").onclick=openPicker;
   const na=$("#ieNewAsset");if(na) na.onclick=newAssetForInventory;
   $("#ieSave").onclick=()=>saveInventory();
@@ -2333,6 +2502,8 @@ renderUnits();renderView();
     if(S.unit&&!S.units.some(u=>u.code===S.unit)) S.unit=null;
     renderView();
   },e=>{toast("Couldn't load units: "+e.message)});
+  db.collection("documents").limit(1000).onSnapshot(snap=>{S.docs=snap.docs.map(d=>d.data()).filter(d=>d&&d.id);renderUnits();
+    if(S.view==="documents"&&!$("#overlay").innerHTML) renderView();if(S.view==="inv-edit"&&!S.dirty&&!$("#overlay").innerHTML) renderView()},e=>{S.docs=[];console.warn("documents",e)});
   startCatalog();
   const t=S.pendingTag||hashTag();if(t) openAsset(t);
 })();
