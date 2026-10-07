@@ -143,7 +143,20 @@ pre.sample{background:var(--sunk);border-radius:var(--r);padding:10px;font-famil
 .selbar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);align-self:center;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--ink);color:var(--bg);padding:8px 10px 8px 16px;border-radius:999px;box-shadow:0 8px 28px rgb(0 0 0 / .25)}
 .selbar .btn{border-radius:999px}
 .label-card.void .qr{opacity:.18;filter:grayscale(1)}.label-card.void .big{text-decoration:line-through;opacity:.6}
-.docfile{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:12.5px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0}.docfile.new{color:var(--ink)}.st-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.st-sum>div{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}.st-sum b{display:block;font-size:24px;line-height:1.1}.st-sum b small{font-size:14px;color:var(--muted);font-weight:600}.st-sum span{font-size:13px;color:var(--muted)}.st-sum .bad{border-color:var(--bad);background:var(--bad-soft)}.st-sum .bad b{color:var(--bad)}.st-sum .warn{border-color:var(--warn);background:var(--warn-soft)}.docrow{display:flex;align-items:center;gap:4px}
+.docfile{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:12.5px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0}.tabs{overflow-x:auto;scrollbar-width:none}
+.holist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.holist>li{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.holist>li.off{opacity:.55}.holist>li.off .hophoto{filter:grayscale(1)}
+.hophoto{position:relative}.hoimg{width:96px;height:96px;object-fit:cover;border-radius:8px;display:block;background:var(--sunk)}
+.hoimg.none{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);text-align:center}
+.hotag{position:absolute;left:4px;bottom:4px;font-size:10px;background:rgb(0 0 0/.62);color:#fff;padding:1px 5px;border-radius:4px}
+.hobody{display:grid;gap:6px;min-width:0}.horow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.holist input:not([type=checkbox]):not([type=file]),.holist select,.hogrid input{border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:7px 9px;min-width:0}
+.horow input:not([type=checkbox]),.horow select{flex:1 1 140px;width:0;min-width:110px;max-width:100%}.hobody>*{min-width:0}
+.hogrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.hogrid figure{margin:0;position:relative;display:grid;gap:4px}
+.hogrid .hoimg{width:100%;height:130px}.hogrid [data-rrm]{position:absolute;top:4px;right:4px;background:var(--surface)}
+.hosig{max-height:64px;max-width:200px;background:#fff;border-radius:6px;padding:4px}.flag.okflag{background:var(--ok-soft)}
+.docfile.new{color:var(--ink)}.st-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.st-sum>div{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}.st-sum b{display:block;font-size:24px;line-height:1.1}.st-sum b small{font-size:14px;color:var(--muted);font-weight:600}.st-sum span{font-size:13px;color:var(--muted)}.st-sum .bad{border-color:var(--bad);background:var(--bad-soft)}.st-sum .bad b{color:var(--bad)}.st-sum .warn{border-color:var(--warn);background:var(--warn-soft)}.docrow{display:flex;align-items:center;gap:4px}
 
 .check{display:flex;gap:8px;align-items:center;cursor:pointer}
 .report-list{margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:grid;gap:3px}
@@ -376,7 +389,7 @@ async function call(fn,...args){
   return j.result;
 }
 const clone=o=>o===undefined?undefined:JSON.parse(JSON.stringify(o));
-const COLS=["units","properties","assets","products","vendors","inventories","transfers","counters","documents","stocktakes"];
+const COLS=["units","properties","assets","products","vendors","inventories","transfers","counters","documents","stocktakes","handovers"];
 const M={};COLS.forEach(c=>M[c]=new Map());
 let serverTime=0,code=LS("code");
 const listeners=new Set();          // {kind,col,path,q,cb}
@@ -511,6 +524,8 @@ const photoCache={};
 window.photoData=id=>photoCache[id]=photoCache[id]||call("apiPhotoData",code,id);
 window.uploadDocFile=async f=>{if(f.size>15*1024*1024) throw new Error(f.name+" is larger than 15 MB. Please use a smaller file.");return call("apiUploadDoc",code,f.name,(await blobToDataUrl(f)).split(",")[1],f.type||"application/octet-stream")};
 window.deleteDocFile=id=>call("apiDeletePhoto",code,id);
+window.twcCall=(fn,...a)=>call(fn,code,...a);window.twcSync=()=>sync();
+window.twcFlush=async()=>{for(let i=0;i<400&&(queue.length||flushing);i++){if(!flushing) await flush();else await new Promise(r=>setTimeout(r,150))}if(queue.length) throw new Error("Changes are still saving. Please try again.")};
 
 /* ---------- downloads: label sheets open in a new tab, files are saved to Google Drive ---------- */
 const dlbar=document.createElement("div");dlbar.id="dlbar";dlbar.hidden=true;document.body.appendChild(dlbar);
@@ -638,6 +653,8 @@ $("#unitSelect").addEventListener("change",e=>selectUnit(e.target.value||null));
 $("#unitFilter").addEventListener("input",renderUnits);
 
 function selectUnit(code,force){
+  if(S.view==="handover"&&S.hoDirty&&!force){confirmDiscard(()=>{S.hoDirty=false;selectUnit(code,true)});renderUnits();return}
+  S.ho=null;S.hoDirty=false;
   if(S.view==="inv-edit"&&S.dirty&&!force){confirmDiscard(()=>selectUnit(code,true));renderUnits();return}
   S.dirty=false;S.edit=null;
   S.selected.clear(); S.filter={q:"",status:"",cat:""};
@@ -755,6 +772,7 @@ function renderView(){
   if(S.view==="search") return renderSearch(v);
   if(S.view==="transfers") return renderTransfers(v);
   if(S.view==="documents") return renderDocuments(v);
+  if(S.view==="handover") return renderHandover(v);
   if(!S.units.length){
     v.innerHTML=`<div class="empty">
       <span class="eyebrow">Getting started</span>
@@ -797,6 +815,7 @@ function renderUnitView(v){
   const notSeen=S.assets.filter(a=>a.status!=="Disposed"&&(daysAgo(a.verifiedAt)===null||daysAgo(a.verifiedAt)>180)).length;
   if(S.unitTab==="stock") return renderUnitStock(v,u);
   if(S.unitTab==="stocktakes") return renderUnitStocktakes(v,u);
+  if(S.unitTab==="handovers") return renderUnitHandovers(v,u);
   const rows=filtered();
   const keepFocus=document.activeElement?.id==="assetSearch";
   v.innerHTML=`<div class="pagehead"><div><button class="linkback" onclick="selectUnit('${u.property?"__prop:"+esc(u.property):""}')">← ${esc(propName(u.property))}</button><h2>${esc(u.name)}</h2><div class="sub"><span class="tagchip">${esc(u.code)}</span> &nbsp;<span class="num">${S.assets.length}</span> tagged items${notSeen?` · <span class="stale">${notSeen} not verified in 6 months</span>`:""}</div></div>
@@ -1649,7 +1668,7 @@ function renderUnitStock(v,u){
     b.innerHTML=stockTableHtml(rows.filter(r=>r.unit===u.code&&(r.here||r.movedOut||r.disposed)).sort((a,b)=>(prodById(a.pid)||{name:""}).name.localeCompare((prodById(b.pid)||{name:""}).name)));
     b.querySelector("tbody")?.addEventListener("click",e=>{const tr=e.target.closest("tr[data-pid]");if(tr) openProduct(tr.dataset.pid)})}).catch(fail);
 }
-function unitTabs(){return `<div class="tabs" role="tablist"><button role="tab" data-tab="items" aria-selected="${!S.unitTab||S.unitTab==="items"}">Tagged items</button><button role="tab" data-tab="stock" aria-selected="${S.unitTab==="stock"}">Stock by asset</button><button role="tab" data-tab="stocktakes" aria-selected="${S.unitTab==="stocktakes"}">Stocktakes</button></div>`}
+function unitTabs(){return `<div class="tabs" role="tablist"><button role="tab" data-tab="items" aria-selected="${!S.unitTab||S.unitTab==="items"}">Tagged items</button><button role="tab" data-tab="stock" aria-selected="${S.unitTab==="stock"}">Stock by asset</button><button role="tab" data-tab="stocktakes" aria-selected="${S.unitTab==="stocktakes"}">Stocktakes</button><button role="tab" data-tab="handovers" aria-selected="${S.unitTab==="handovers"}">Handovers</button></div>`}
 function unitTabsOld(){return `<div class="tabs" role="tablist"><button role="tab" data-tab="items" aria-selected="${S.unitTab!=="stock"}">Tagged items</button><button role="tab" data-tab="stock" aria-selected="${S.unitTab==="stock"}">Stock by asset</button></div>`}
 function wireUnitTabs(){document.querySelectorAll(".tabs [data-tab]").forEach(b=>b.onclick=()=>{S.unitTab=b.dataset.tab;S.selected.clear();renderView()})}
 
@@ -1982,6 +2001,171 @@ function renderUnitStocktakes(v,u){
       :`<div class="empty"><h3>No stocktakes yet</h3><p>Tap <b>Start stocktake</b> and scan every label in this unit. Each stocktake is saved here with what was found, missing or in the wrong unit, ready to print.</p></div>`;
     b.querySelector("tbody")?.addEventListener("click",e=>{const tr=e.target.closest("tr[data-st]");if(tr) openStocktakeRecord(rows.find(x=>x.id===tr.dataset.st))});
   }).catch(fail);
+}
+
+/* ---------- Move-in / move-out handovers ---------- */
+const SIGN_PAGE="https://jen826.github.io/twc-assets/sign.html";
+const HO_EXTRAS=["Door key","Access card","Locker key","Pedestal key","Aircon remote"];
+const HO_CONDS=["New","Good","Fair","Poor","Damaged"];
+const hoLink=h=>h&&h.token?(h.signPage||SIGN_PAGE)+"?h="+encodeURIComponent(h.token):"";
+const hoDate=h=>h&&h.date?fmtDate(Date.parse(h.date+"T00:00:00")):"";
+const hoStatusPill=s=>s==="Signed"?`<span class="pill s-inuse"><span class="dot"></span>Signed</span>`:s==="Sent"?`<span class="pill s-repair"><span class="dot"></span>Waiting for signature</span>`:`<span class="pill s-storage"><span class="dot"></span>Draft</span>`;
+function hoList(unit){return S.db.collection("handovers").where("unit","==",unit).limit(500).get().then(sn=>sn.docs.map(d=>d.data()).filter(h=>h&&h.id)
+  .sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))||(b.createdAt||0)-(a.createdAt||0)))}
+function renderUnitHandovers(v,u){
+  v.innerHTML=`<div class="pagehead"><div><button class="linkback" onclick="selectUnit('${u.property?"__prop:"+esc(u.property):""}')">← ${esc(propName(u.property))}</button><h2>${esc(u.name)}</h2><div class="sub"><span class="tagchip">${esc(u.code)}</span></div></div>
+    <div class="actions"><button class="btn primary" data-write id="hoNewIn">+ Move-in handover</button><button class="btn" data-write id="hoNewOut">+ Move-out handover</button></div></div>
+    ${unitTabs()}<div id="hoHist"><div class="empty"><h3>Loading handovers…</h3></div></div>`;
+  wireUnitTabs();$("#hoNewIn").onclick=()=>newHandover(u.code,"Move-in");$("#hoNewOut").onclick=()=>newHandover(u.code,"Move-out");applyWriteGate();
+  hoList(u.code).then(rows=>{if(S.unit!==u.code||S.unitTab!=="handovers"||S.view) return;const b=$("#hoHist");if(!b) return;
+    b.innerHTML=rows.length?`<div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Type</th><th>Tenant</th><th style="text-align:right">Items</th><th>Status</th></tr></thead><tbody>
+      ${rows.map(h=>`<tr data-ho="${esc(h.id)}"><td class="num" style="white-space:nowrap">${esc(hoDate(h))}</td><td>${esc(h.type)}</td><td>${esc((h.tenant||{}).company||"")}<div class="muted" style="font-size:12.5px">${esc((h.tenant||{}).name||"")}</div></td>
+        <td class="num mono" style="text-align:right">${(h.items||[]).filter(i=>i.included!==false).length+(h.extras||[]).length}</td><td>${hoStatusPill(h.status)}${h.status==="Signed"&&h.signedAt?`<div class="muted" style="font-size:12px">${esc(fmtDate(h.signedAt))}</div>`:""}</td></tr>`).join("")}
+      </tbody></table></div>`
+      :`<div class="empty"><h3>No handovers yet</h3><p>Create a move-in handover when a tenant takes this unit. It lists every item with its photo and condition, plus keys and access cards. Email it to the tenant to review and sign on their phone or computer.</p></div>`;
+    b.querySelector("tbody")?.addEventListener("click",e=>{const tr=e.target.closest("tr[data-ho]");if(tr) openHandover(rows.find(x=>x.id===tr.dataset.ho))});
+  }).catch(fail);
+}
+async function newHandover(unit,type){
+  const items=S.assets.filter(a=>a.unit===unit&&a.status!=="Disposed").sort((a,b)=>a.tag.localeCompare(b.tag,undefined,{numeric:true})).map(a=>{const ap=assetPhotos(a);
+    return {key:"t:"+a.tag,kind:"tag",tag:a.tag,name:a.name||"",qty:1,location:a.location||"",condition:HO_CONDS.includes(a.condition)?a.condition:"Good",note:"",photo:ap.ids[0]||"",photoFrom:ap.ids.length?(ap.own?"asset":"catalogue"):"",included:true}});
+  try{(await computeStock()).filter(r=>r.unit===unit&&r.untagged>0).forEach(r=>{const p=prodById(r.pid)||{name:"(asset)",photos:[]};
+    items.push({key:"s:"+r.pid,kind:"stock",pid:r.pid,name:p.name+(p.colour?` (${p.colour})`:""),qty:r.untagged,location:"",condition:"Good",note:"",photo:(p.photos||[])[0]||"",photoFrom:(p.photos||[]).length?"catalogue":"",included:true})})}catch(e){}
+  S.ho={id:"",unit,type,date:localDay(),tenant:{company:"",name:"",email:"",phone:""},items,extras:[],roomPhotos:[],notes:"",status:"Draft"};
+  S.hoDirty=true;S.view="handover";renderUnits();renderView();window.scrollTo(0,0);
+}
+function openHandover(h){if(!h) return;S.ho=JSON.parse(JSON.stringify(h));S.ho.tenant=S.ho.tenant||{};["items","extras","roomPhotos"].forEach(k=>S.ho[k]=S.ho[k]||[]);
+  S.hoDirty=false;S.view="handover";renderUnits();renderView();window.scrollTo(0,0)}
+function leaveHandover(){const h=S.ho;S.hoDirty=false;S.ho=null;S.unitTab="handovers";selectUnit(h?h.unit:null,true)}
+function renderHandover(v){
+  const h=S.ho;if(!h){S.view=null;renderView();return}
+  const locked=h.status==="Signed",dis=locked?"disabled":"";
+  const inc=h.items.filter(i=>i.included!==false);
+  const ph=id=>id?photoImg(id,240,"hoimg"):`<span class="hoimg none" aria-hidden="true">No photo</span>`;
+  v.innerHTML=`<div class="pagehead"><div><button class="linkback" id="hoBack">← ${esc(unitLabel(h.unit))} · Handovers</button><h2>${esc(h.type)} handover</h2>
+     <div class="sub">${hoStatusPill(h.status)}${h.id?` <span class="tagchip">${esc(h.id)}</span>`:""}${S.hoDirty&&!locked?` · <span class="stale">Unsaved changes</span>`:""}</div></div>
+    <div class="actions">${locked?"":`<button class="btn" data-write id="hoSave">Save</button><button class="btn primary" data-write id="hoSend">${h.status==="Sent"?"Resend to tenant":"Send to tenant"}</button>`}
+      <button class="btn" id="hoPrint">${locked?"Download signed copy":"Preview / print"}</button>${!locked&&h.id?`<button class="btn ghost danger" data-write id="hoDel">Delete</button>`:""}</div></div>
+    ${h.status==="Signed"?`<div class="flag okflag"><div><b>Signed by ${esc(h.signerName||"the tenant")}</b><div class="muted" style="font-size:13px">${esc(fmtDate(h.signedAt))} ${esc(fmtTime(h.signedAt))}. This handover is now locked. A signed copy was emailed to the tenant and to you.</div></div>${h.signatureFile?`<img class="hosig" src="${photoUrl(h.signatureFile)}" alt="Tenant's signature" referrerpolicy="no-referrer">`:""}</div>`
+     :h.status==="Sent"?`<div class="flag"><div><b>Sent to ${esc(h.sentTo||"")}</b><div class="muted" style="font-size:13px">${esc(fmtDate(h.sentAt))} ${esc(fmtTime(h.sentAt))} · waiting for the tenant to sign. If you change anything, send it again.</div></div><button class="btn" id="hoCopy">Copy signing link</button></div>`:""}
+    <section class="panel"><div class="grid4">
+      <div class="field"><label for="ho-type">Type</label><select id="ho-type" ${dis}>${["Move-in","Move-out"].map(t=>`<option ${h.type===t?"selected":""}>${t}</option>`).join("")}</select></div>
+      <div class="field"><label for="ho-date">Handover date</label><input id="ho-date" type="date" value="${esc(h.date)}" ${dis}></div>
+      <div class="field span2"><label for="ho-co">Tenant company</label><input id="ho-co" value="${esc(h.tenant.company||"")}" placeholder="e.g. Company A Pte Ltd" ${dis}></div>
+      <div class="field"><label for="ho-name">Contact person <span class="req">*</span></label><input id="ho-name" value="${esc(h.tenant.name||"")}" autocomplete="off" ${dis}></div>
+      <div class="field span2"><label for="ho-email">Email <span class="req">*</span></label><input id="ho-email" type="email" value="${esc(h.tenant.email||"")}" placeholder="Where the handover is sent for signing" autocomplete="off" ${dis}></div>
+      <div class="field"><label for="ho-phone">Phone</label><input id="ho-phone" type="tel" value="${esc(h.tenant.phone||"")}" ${dis}></div>
+      <div class="field span3"><label for="ho-notes">Notes for the tenant</label><input id="ho-notes" value="${esc(h.notes||"")}" placeholder="e.g. Aircon serviced on 1 Oct. 2 more chairs will be delivered next week." ${dis}></div>
+    </div></section>
+    <div class="pagehead" style="margin-top:4px"><h3 class="h3">Items (${inc.length}${inc.length!==h.items.length?` of ${h.items.length}`:""})</h3></div>
+    ${h.items.length?`<ul class="holist">${h.items.map((it,i)=>`<li class="${it.included===false?"off":""}" data-i="${i}">
+       <div class="hophoto">${ph(it.photo)}${it.photo&&it.photoFrom==="catalogue"?`<span class="hotag">Catalogue</span>`:""}</div>
+       <div class="hobody"><div><b>${esc(it.name)}</b>${it.qty>1?` <span class="muted">× ${it.qty}</span>`:""}</div>
+         <div class="muted" style="font-size:12.5px">${it.tag?`<span class="tagchip">${esc(it.tag)}</span> `:"Not tagged "}${esc(it.location||"")}</div>
+         <div class="horow"><select data-k="condition" aria-label="Condition" ${dis}>${HO_CONDS.map(c=>`<option ${it.condition===c?"selected":""}>${c}</option>`).join("")}</select>
+           <input data-k="note" value="${esc(it.note||"")}" placeholder="Note, e.g. small scratch on armrest" aria-label="Note" ${dis}></div>
+         ${locked?"":`<div class="horow"><label class="btn">${it.photoFrom==="handover"?"Retake photo":"Take photo"}<input type="file" data-photo="${i}" accept="image/\x2a" capture="environment" hidden></label>
+           <label class="check small"><input type="checkbox" data-k="included" ${it.included!==false?"checked":""}> Include in handover</label></div>`}
+       </div></li>`).join("")}</ul>`:`<p class="muted" style="margin:0">No items are recorded in this unit yet. You can still add keys, access cards and unit photos below.</p>`}
+    <div class="pagehead" style="margin-top:4px"><h3 class="h3">Keys, access cards and other items</h3></div>
+    ${h.extras.length?`<ul class="holist">${h.extras.map((x,i)=>`<li data-x="${i}"><div class="hophoto">${ph(x.photo)}</div><div class="hobody">
+       <div class="horow"><input data-xk="label" value="${esc(x.label)}" placeholder="Item, e.g. Main door key" aria-label="Item" ${dis}><input data-xk="qty" type="number" min="1" value="${esc(x.qty)}" aria-label="Quantity" style="flex:0 0 76px" ${dis}></div>
+       <div class="horow"><input data-xk="note" value="${esc(x.note||"")}" placeholder="Note, e.g. card numbers 1001 to 1004" aria-label="Note" ${dis}></div>
+       ${locked?"":`<div class="horow"><label class="btn">${x.photo?"Retake photo":"Take photo"}<input type="file" data-xphoto="${i}" accept="image/\x2a" capture="environment" hidden></label><button type="button" class="btn ghost danger" data-xrm="${i}">Remove</button></div>`}</div></li>`).join("")}</ul>`:""}
+    ${locked?"":`<div class="actions">${HO_EXTRAS.map(t=>`<button type="button" class="btn" data-xadd="${esc(t)}">+ ${esc(t)}</button>`).join("")}<button type="button" class="btn" data-xadd="">+ Other</button></div>`}
+    <div class="pagehead" style="margin-top:4px"><h3 class="h3">Unit photos (${h.roomPhotos.length})</h3>${locked?"":`<div class="actions"><label class="btn primary">+ Add photos<input type="file" id="hoRoomIn" accept="image/\x2a" multiple hidden></label></div>`}</div>
+    ${h.roomPhotos.length?`<div class="hogrid">${h.roomPhotos.map((p,i)=>`<figure data-r="${i}">${photoImg(p.id,400,"hoimg")}<input data-rk="caption" value="${esc(p.caption||"")}" placeholder="Caption, e.g. Meeting room wall" aria-label="Photo caption" ${dis}>${locked?"":`<button type="button" class="btn ghost danger" data-rrm="${i}" aria-label="Remove photo">✕</button>`}</figure>`).join("")}</div>`
+      :`<p class="muted" style="margin:0">Add photos of walls, floors, carpet, windows and fixtures to record the unit's condition.</p>`}
+    <p class="hint" id="hoStatus" style="margin:0"></p>`;
+  const mark=()=>{if(S.hoDirty) return;S.hoDirty=true;const sub=v.querySelector(".pagehead .sub");if(sub&&!/Unsaved/.test(sub.innerHTML)) sub.insertAdjacentHTML("beforeend",` · <span class="stale">Unsaved changes</span>`)};
+  const bind=(id,set)=>{const el=$("#"+id);if(el) el.oninput=el.onchange=()=>{set(el.value);mark()}};
+  bind("ho-type",x=>h.type=x);bind("ho-date",x=>h.date=x);bind("ho-co",x=>h.tenant.company=x);bind("ho-name",x=>h.tenant.name=x);
+  bind("ho-email",x=>h.tenant.email=x.trim());bind("ho-phone",x=>h.tenant.phone=x);bind("ho-notes",x=>h.notes=x);
+  v.querySelectorAll("li[data-i]").forEach(li=>{const it=h.items[+li.dataset.i];
+    li.querySelectorAll("[data-k]").forEach(el=>el.oninput=el.onchange=()=>{if(el.dataset.k==="included"){it.included=el.checked;li.classList.toggle("off",!el.checked)}else it[el.dataset.k]=el.value;mark()})});
+  v.querySelectorAll("li[data-x]").forEach(li=>{const x=h.extras[+li.dataset.x];
+    li.querySelectorAll("[data-xk]").forEach(el=>el.oninput=el.onchange=()=>{x[el.dataset.xk]=el.dataset.xk==="qty"?Math.max(1,parseInt(el.value,10)||1):el.value;mark()})});
+  v.querySelectorAll("figure[data-r]").forEach(f=>{const p=h.roomPhotos[+f.dataset.r],c=f.querySelector("[data-rk]");if(c) c.oninput=()=>{p.caption=c.value;mark()}});
+  const st=t=>{const e=$("#hoStatus");if(e) e.textContent=t||""};
+  const up=async(file,done)=>{st("Uploading photo…");try{const id=await uploadPhoto(file);done(id);S.hoDirty=true;renderView()}catch(err){toast(err&&err.message||"The photo couldn't be added.")}finally{st("")}};
+  v.querySelectorAll("input[data-photo]").forEach(inp=>inp.onchange=()=>{const f=inp.files[0];inp.value="";if(f) up(f,id=>{const it=h.items[+inp.dataset.photo];it.photo=id;it.photoFrom="handover";it.included=true})});
+  v.querySelectorAll("input[data-xphoto]").forEach(inp=>inp.onchange=()=>{const f=inp.files[0];inp.value="";if(f) up(f,id=>{h.extras[+inp.dataset.xphoto].photo=id})});
+  const ri=$("#hoRoomIn");if(ri) ri.onchange=async()=>{const fs=[...ri.files];ri.value="";
+    for(let i=0;i<fs.length;i++){st(`Uploading ${i+1} of ${fs.length}…`);try{h.roomPhotos.push({id:await uploadPhoto(fs[i]),caption:""});S.hoDirty=true}catch(err){toast(err&&err.message||"A photo couldn't be added.")}}
+    st("");renderView()};
+  v.querySelectorAll("[data-xadd]").forEach(b=>b.onclick=()=>{h.extras.push({label:b.dataset.xadd,qty:1,note:"",photo:""});S.hoDirty=true;renderView();
+    const l=v.querySelectorAll("li[data-x]"),last=l[l.length-1];if(last) last.querySelector(b.dataset.xadd?'[data-xk="note"]':'[data-xk="label"]')?.focus()});
+  v.querySelectorAll("[data-xrm]").forEach(b=>b.onclick=()=>{h.extras.splice(+b.dataset.xrm,1);S.hoDirty=true;renderView()});
+  v.querySelectorAll("[data-rrm]").forEach(b=>b.onclick=()=>{h.roomPhotos.splice(+b.dataset.rrm,1);S.hoDirty=true;renderView()});
+  $("#hoBack").onclick=()=>{if(S.hoDirty&&!locked) confirmDiscard(leaveHandover);else leaveHandover()};
+  const sv=$("#hoSave");if(sv) sv.onclick=async()=>{sv.disabled=true;if(await saveHandover()) toast("Handover saved");const s2=$("#hoSave");if(s2) s2.disabled=false};
+  const sd=$("#hoSend");if(sd) sd.onclick=sendHandover;
+  $("#hoPrint").onclick=()=>printHandover(h);
+  const cp=$("#hoCopy");if(cp) cp.onclick=async()=>{const link=hoLink(h);try{await navigator.clipboard.writeText(link);toast("Signing link copied")}
+    catch(e){modal(`<h3>Signing link</h3><p style="margin:0;word-break:break-all"><a href="${esc(link)}" target="_blank" rel="noopener">${esc(link)}</a></p><div class="row-end"><button class="btn" data-close>Close</button></div>`)}};
+  const dl=$("#hoDel");if(dl) dl.onclick=()=>{modal(`<h3>Delete this handover?</h3><p style="margin:0">The handover list is removed${h.status==="Sent"?" and the signing link stops working":""}. Photos stay in Google Drive.</p>
+    <div class="row-end"><button class="btn" data-close>Keep it</button><button class="btn danger" id="hdGo">Delete</button></div>`);
+    $("#hdGo").onclick=async()=>{try{await S.db.doc("handovers/"+h.id).delete();closeOverlay();toast("Handover deleted");leaveHandover()}catch(e){fail(e)}}};
+  applyWriteGate();
+}
+async function saveHandover(){
+  const h=S.ho;if(!h) return false;
+  if(h.status==="Signed"){toast("A signed handover can't be changed");return false}
+  const now=Date.now();
+  if(!h.id){h.id="HO-"+localDay().replace(/-/g,"")+"-"+now.toString(36).slice(-5).toUpperCase();h.createdAt=now;h.createdBy=S.me||null;h.staffName=whoName(S.me)}
+  h.updatedAt=now;h.updatedBy=S.me||null;
+  const rec=JSON.parse(JSON.stringify(h));
+  if(JSON.stringify(rec).length>45000){toast("This handover is too long to save in one record. Split it into two handovers.");return false}
+  try{await S.db.doc("handovers/"+h.id).set(rec);S.hoDirty=false;renderView();return true}catch(e){fail(e);return false}
+}
+function sendHandover(){
+  const h=S.ho,em=String(h.tenant.email||"").trim();
+  if(!String(h.tenant.name||"").trim()){toast("Enter the tenant's contact person");$("#ho-name")?.focus();return}
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){toast("Enter a valid email address for the tenant");$("#ho-email")?.focus();return}
+  if(!window.twcCall){toast("Sending isn't available in this view");return}
+  const n=h.items.filter(i=>i.included!==false).length+h.extras.length,np=hoPhotoIds(h).length;
+  modal(`<h3>${h.status==="Sent"?"Resend":"Send"} the handover to ${esc(em)}?</h3>
+   <p style="margin:0">${esc(h.tenant.name)} gets an email listing the ${n} item${n===1?"":"s"}${np?` with ${np} photo${np===1?"":"s"}`:""}, and a button to review and sign online. Once they sign, you both get a signed copy by email.</p>
+   <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="hsGo">Send email</button></div>`);
+  $("#hsGo").onclick=async()=>{const b=$("#hsGo");b.disabled=true;b.textContent="Saving…";
+    try{
+      if(!(await saveHandover())){b.disabled=false;b.textContent="Send email";return}
+      await window.twcFlush();b.textContent="Sending…";
+      const r=await window.twcCall("apiHandoverSend",h.id,{signPage:SIGN_PAGE,by:whoName(S.me)});
+      Object.assign(S.ho,r.record||{});S.hoDirty=false;closeOverlay();toast(`Sent to ${em}`);renderView();if(window.twcSync) window.twcSync();
+    }catch(e){b.disabled=false;b.textContent="Try again";toast("Couldn't send: "+String(e&&e.message||e).replace(/^Error:\s*/,""))}};
+}
+function hoPhotoIds(h){return [...h.items.filter(i=>i.included!==false).map(i=>i.photo),...h.extras.map(x=>x.photo),...h.roomPhotos.map(p=>p.id)].filter(Boolean)}
+function handoverDocHtml(h){
+  const u=S.units.find(x=>x.code===h.unit)||{},inc=h.items.filter(i=>i.included!==false),signed=h.status==="Signed";
+  const im=(id,w)=>id?`<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=w${w||500}" referrerpolicy="no-referrer" alt="">`:`<div class="noph">No photo</div>`;
+  const decl=h.type==="Move-out"?"I confirm that the items listed above were returned in the condition described and shown in the photos.":"I confirm that I have received the items listed above, in the condition described and shown in the photos.";
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${esc(h.type)} handover ${esc(unitLabel(h.unit))} ${esc(hoDate(h))}</title><style>
+@page{size:A4;margin:12mm}body{font:10.5pt/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#111;margin:0}
+h1{font-size:18pt;margin:0 0 1mm}h2{font-size:12pt;margin:6mm 0 2mm;border-bottom:0.3mm solid #999;padding-bottom:1mm}
+.meta{display:grid;grid-template-columns:34mm 1fr;gap:1mm 4mm;margin:3mm 0}.meta dt{color:#555}.meta dd{margin:0;font-weight:600}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:1.5mm;border-bottom:0.2mm solid #ccc;vertical-align:top}th{background:#f2f2f2;font-size:9.5pt}
+td img,.noph{width:30mm;height:24mm;object-fit:cover;border-radius:1.5mm;display:block;background:#eee}.noph{font-size:8pt;color:#777;display:flex;align-items:center;justify-content:center}
+.mono{font-family:Menlo,Consolas,monospace;font-size:9pt}.cond{font-weight:700}.Damaged,.Poor{color:#b0362f}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm}.grid figure{margin:0;break-inside:avoid}.grid img{width:100%;height:42mm;object-fit:cover;border-radius:1.5mm}.grid figcaption{font-size:9pt;color:#444}
+tr{break-inside:avoid}.decl{margin:3mm 0}.sig img{max-height:22mm;max-width:70mm}
+.lines{display:grid;grid-template-columns:1fr 1fr;gap:12mm;margin-top:16mm}.lines div{border-top:0.3mm solid #333;padding-top:2mm;font-size:9pt;color:#333}
+.tip{font:10pt system-ui;background:#fff6d6;padding:3mm;border-radius:2mm;margin-bottom:4mm}@media print{.tip{display:none}}
+</style></head><body><p class="tip">Use your browser's Print (Ctrl+P / Share → Print) to print or save as PDF.</p>
+<h1>${esc(h.type)} handover</h1><div>TWC · ${esc(propName(u.property))} · ${esc(u.name||h.unit)}</div>
+<dl class="meta"><dt>Tenant</dt><dd>${esc([h.tenant.company,h.tenant.name].filter(Boolean).join(" · "))}</dd><dt>Handover date</dt><dd>${esc(hoDate(h))}</dd>
+<dt>Prepared by</dt><dd>${esc(h.staffName||whoName(S.me))}</dd><dt>Reference</dt><dd class="mono">${esc(h.id||"Not saved yet")}</dd><dt>Status</dt><dd>${signed?"Signed":h.status==="Sent"?"Sent, waiting for signature":"Draft"}</dd>${h.notes?`<dt>Notes</dt><dd>${esc(h.notes)}</dd>`:""}</dl>
+<h2>Items (${inc.length})</h2>${inc.length?`<table><thead><tr><th>Photo</th><th>Item</th><th>Condition</th><th>Note</th></tr></thead><tbody>${inc.map(it=>`<tr><td>${im(it.photo,400)}</td><td><b>${esc(it.name)}</b>${it.qty>1?` × ${it.qty}`:""}<br><span class="mono">${esc(it.tag||"")}</span> ${esc(it.location||"")}</td><td class="cond ${esc(it.condition)}">${esc(it.condition)}</td><td>${esc(it.note||"")}</td></tr>`).join("")}</tbody></table>`:"<p>None</p>"}
+${h.extras.length?`<h2>Keys, access cards and other items</h2><table><thead><tr><th>Photo</th><th>Item</th><th>Qty</th><th>Note</th></tr></thead><tbody>${h.extras.map(x=>`<tr><td>${im(x.photo,400)}</td><td><b>${esc(x.label)}</b></td><td>${esc(x.qty)}</td><td>${esc(x.note||"")}</td></tr>`).join("")}</tbody></table>`:""}
+${h.roomPhotos.length?`<h2>Unit photos</h2><div class="grid">${h.roomPhotos.map(p=>`<figure><img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(p.id)}&sz=w800" referrerpolicy="no-referrer" alt=""><figcaption>${esc(p.caption||"")}</figcaption></figure>`).join("")}</div>`:""}
+<h2>Acknowledgement</h2><p class="decl">${esc(decl)}</p>
+${signed?`<div class="sig">${h.signatureFile?`<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(h.signatureFile)}&sz=w600" referrerpolicy="no-referrer" alt="Signature">`:""}<div><b>${esc(h.signerName||"")}</b>, signed ${esc(fmtDate(h.signedAt))} ${esc(fmtTime(h.signedAt))} (signed online)</div></div>`
+  :`<div class="lines"><div>Tenant: name, signature, date</div><div>TWC representative: name, signature, date</div></div>`}
+</body></html>`;
+}
+async function printHandover(h){
+  if(!S.dl){toast("Downloads aren't available in this view");return}
+  try{await S.dl.save({filename:`handover-${h.unit}-${h.date||localDay()}.html`,data:handoverDocHtml(h)})}catch(e){if(e.code!=="declined") toast("Couldn't download: "+e.message)}
 }
 
 /* ---------- Overlays ---------- */

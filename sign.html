@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Handover · TWC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,600..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root{--bg:#f3f4f2;--surface:#fff;--sunk:#e8eae6;--line:#d5d8d2;--ink:#1b2127;--muted:#5d666e;--accent:#b85c00;--accent-soft:#f6e6d3;--ok:#2f7a4a;--ok-soft:#e1f0e6;--bad:#b0362f;--bad-soft:#f6dcda;--r:10px;
+  --f-display:"Archivo",system-ui,sans-serif;--f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);-webkit-text-size-adjust:100%}
+.top{background:var(--ink);color:#fff;padding:14px 16px}
+.top .in{max-width:860px;margin:0 auto;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.brand{font:800 15px var(--f-display);letter-spacing:.12em}.top small{color:#c9ced2}
+.wrap{max-width:860px;margin:0 auto;padding:20px 16px 64px}
+h1{font:800 26px/1.15 var(--f-display);margin:0 0 4px}
+h2{font:700 17px var(--f-display);margin:26px 0 10px}
+.muted{color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.meta{display:grid;grid-template-columns:132px 1fr;gap:6px 12px;margin:0}.meta dt{color:var(--muted)}.meta dd{margin:0;font-weight:600;min-width:0;overflow-wrap:anywhere}
+.notes{margin:12px 0 0;padding-top:12px;border-top:1px solid var(--line);white-space:pre-wrap}
+.items{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.items li{display:grid;grid-template-columns:88px minmax(0,1fr);gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.items img,.grid img{font-size:0;color:transparent}
+.items img,.noph{width:88px;height:88px;object-fit:cover;border-radius:8px;background:var(--sunk);display:block}
+.noph{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted)}
+.tag{font:500 12px var(--f-mono);background:var(--sunk);padding:1px 6px;border-radius:5px}
+.cond{display:inline-block;font-size:12.5px;font-weight:600;border-radius:999px;padding:1px 9px;background:var(--ok-soft);color:var(--ok);margin-right:4px}
+.cond.Fair{background:var(--accent-soft);color:var(--accent)}.cond.Poor,.cond.Damaged{background:var(--bad-soft);color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}.grid figure{margin:0}
+.grid img{width:100%;height:140px;object-fit:cover;border-radius:8px;display:block;background:var(--sunk)}.grid figcaption{font-size:13px;color:var(--muted);margin-top:3px}
+.sign label.f{display:block;font-weight:600;margin:14px 0 6px}
+.sign input[type=text]{width:100%;font:inherit;padding:11px 12px;border:1px solid var(--line);border-radius:var(--r);background:var(--surface);color:var(--ink)}
+canvas{width:100%;height:190px;background:#fff;border:1.5px dashed #9aa3a8;border-radius:var(--r);touch-action:none;display:block;cursor:crosshair}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.btn{font:inherit;font-weight:600;border-radius:999px;padding:11px 20px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}.btn:disabled{opacity:.5;cursor:default}
+.btn:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.agree{display:flex;gap:10px;align-items:flex-start;margin-top:14px;cursor:pointer}.agree input{margin-top:3px;width:20px;height:20px;flex:none;accent-color:var(--accent)}
+.err{color:var(--bad);font-weight:600}
+.done{background:var(--ok-soft);border-color:var(--ok)}
+.sigimg{max-height:110px;max-width:100%;background:#fff;border-radius:6px;display:block;margin:8px 0}
+a{color:var(--accent)}
+.lines{display:none}
+@media (max-width:520px){.meta{grid-template-columns:1fr;gap:0}.meta dd{margin-bottom:8px}}
+@media print{body{background:#fff;font-size:11pt}.top{background:none;color:#000;padding:0 0 4mm}.top small{color:#444}.noprint{display:none!important}.wrap{padding:0;max-width:none}
+  .items li,.card,.grid figure{break-inside:avoid}.items li{border-color:#ccc}}
+</style>
+</head>
+<body>
+<div class="top"><div class="in"><span class="brand">TWC</span><small>Unit handover</small></div></div>
+<main class="wrap" id="app" aria-live="polite"><p class="muted">Loading the handover…</p></main>
+<script>window.TWC_API="https://script.google.com/macros/s/AKfycbwGuAgpMhB8TxNJzAvi6Q3XEQdlxLa0DRqWZ3lr0JOJzmvYsSgRmF8uUSYzal-CQRiojw/exec";</script>
+<script>
+(function(){
+  var $=function(s){return document.querySelector(s)};
+  var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+  var token=new URLSearchParams(location.search).get("h")||"";
+  var thumb=function(id,w){return "https://drive.google.com/thumbnail?id="+encodeURIComponent(id)+"&sz=w"+(w||600)};
+  var fmtD=function(s){if(!s) return "";var d=typeof s==="number"?new Date(s):new Date(s+"T00:00:00");return d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})};
+  var fmtDT=function(ms){return ms?new Date(ms).toLocaleString(undefined,{day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"}):""};
+  function api(fn,args){
+    var tries=0;
+    function go(){
+      return fetch(window.TWC_API,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},body:JSON.stringify({fn:fn,args:args})})
+        .then(function(r){return r.json()})
+        .then(function(j){if(!j.ok){var e=new Error(j.error||"Something went wrong.");e.server=true;throw e}return j.result})
+        .catch(function(e){if(e.server||++tries>=3) throw (e.server?e:new Error("We couldn't reach the server. Please check your connection and try again."));
+          return new Promise(function(res){setTimeout(res,900*tries)}).then(go)});
+    }
+    return go();
+  }
+  function pic(id,w,alt){return id?'<a href="'+thumb(id,1600)+'" target="_blank" rel="noopener"><img src="'+thumb(id,w)+'" alt="'+esc(alt||"")+'" loading="lazy" referrerpolicy="no-referrer"></a>':'<span class="noph">No photo</span>'}
+  function render(h){
+    var signed=h.status==="Signed";
+    var decl=h.type==="Move-out"?"I confirm that the items listed above were returned in the condition described and shown in the photos."
+      :"I confirm that I have received the items listed above, in the condition described and shown in the photos.";
+    var where=[h.unit.property,h.unit.name].filter(Boolean).join(" · ");
+    document.title=h.type+" handover · "+(h.unit.name||"")+" · TWC";
+    var html='<h1>'+esc(h.type)+' handover</h1><div class="muted">'+esc(where)+'</div>'+
+      '<div class="card" style="margin-top:16px"><dl class="meta"><dt>Tenant</dt><dd>'+esc([h.tenant.company,h.tenant.name].filter(Boolean).join(" · "))+'</dd>'+
+      '<dt>Handover date</dt><dd>'+esc(fmtD(h.date))+'</dd><dt>Prepared by</dt><dd>'+esc(h.preparedBy||"TWC")+'</dd><dt>Reference</dt><dd>'+esc(h.id)+'</dd></dl>'+
+      (h.notes?'<p class="notes">'+esc(h.notes)+'</p>':'')+'</div>';
+    html+='<h2>Items ('+h.items.length+')</h2>'+(h.items.length?'<ul class="items">'+h.items.map(function(it){
+      return '<li>'+pic(it.photo,300,it.name)+'<div><b>'+esc(it.name)+'</b>'+(it.qty>1?' <span class="muted">× '+esc(it.qty)+'</span>':'')+
+        '<div class="muted" style="font-size:13px">'+(it.tag?'<span class="tag">'+esc(it.tag)+'</span> ':'')+esc(it.location||"")+'</div>'+
+        '<div style="margin-top:6px"><span class="cond '+esc(it.condition)+'">'+esc(it.condition||"")+'</span>'+esc(it.note||"")+'</div></div></li>'}).join("")+'</ul>':'<p class="muted">No items listed.</p>');
+    if(h.extras.length) html+='<h2>Keys, access cards and other items</h2><ul class="items">'+h.extras.map(function(x){
+      return '<li>'+pic(x.photo,300,x.label)+'<div><b>'+esc(x.label)+'</b> <span class="muted">× '+esc(x.qty)+'</span><div>'+esc(x.note||"")+'</div></div></li>'}).join("")+'</ul>';
+    if(h.roomPhotos.length) html+='<h2>Unit photos</h2><div class="grid">'+h.roomPhotos.map(function(p){return '<figure>'+pic(p.id,500,p.caption)+'<figcaption>'+esc(p.caption||"")+'</figcaption></figure>'}).join("")+'</div>';
+    html+='<h2>Acknowledgement</h2>';
+    if(signed){
+      html+='<div class="card done"><p style="margin:0">'+esc(decl)+'</p>'+(h.signature?'<img class="sigimg" src="'+h.signature+'" alt="Signature of '+esc(h.signerName)+'">':'')+
+        '<div><b>'+esc(h.signerName)+'</b></div><div class="muted">Signed online on '+esc(fmtDT(h.signedAt))+'</div></div>'+
+        '<div class="row noprint"><button class="btn primary" type="button" id="pr">Print or save as PDF</button><span class="muted">A signed copy has been emailed to you.</span></div>';
+    }else{
+      html+='<form class="card sign" id="sf" novalidate><label class="f" for="nm" style="margin-top:0">Your full name</label><input type="text" id="nm" autocomplete="name" value="'+esc(h.tenant.name||"")+'">'+
+        '<label class="f" id="pl">Your signature <span class="muted" style="font-weight:400">(sign with your finger or mouse)</span></label>'+
+        '<canvas id="pad" role="img" aria-labelledby="pl" tabindex="0"></canvas><div class="row"><button type="button" class="btn" id="clr">Clear signature</button></div>'+
+        '<label class="agree"><input type="checkbox" id="ok"><span>'+esc(decl)+'</span></label>'+
+        '<div class="row"><button class="btn primary" id="go" type="submit">Sign and submit</button><span id="msg" class="muted" role="status"></span></div></form>';
+    }
+    $("#app").innerHTML=html;
+    if(signed){$("#pr").onclick=function(){window.print()}}else pad();
+  }
+  function pad(){
+    var c=$("#pad"),ctx=c.getContext("2d"),drawing=false,has=false,last=null,strokes=[];
+    function setup(){var r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);
+      ctx.setTransform(d,0,0,d,0,0);ctx.lineWidth=2.4;ctx.lineCap="round";ctx.lineJoin="round";ctx.strokeStyle="#111";ctx.fillStyle="#111";redraw()}
+    function redraw(){ctx.clearRect(0,0,c.width,c.height);strokes.forEach(function(s){ctx.beginPath();ctx.moveTo(s[0].x,s[0].y);if(s.length===1){ctx.arc(s[0].x,s[0].y,1.2,0,7);ctx.fill();return}
+      for(var i=1;i<s.length;i++) ctx.lineTo(s[i].x,s[i].y);ctx.stroke()})}
+    function pt(e){var r=c.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}}
+    setup();window.addEventListener("resize",setup);
+    c.addEventListener("pointerdown",function(e){drawing=true;has=true;last=pt(e);strokes.push([last]);try{c.setPointerCapture(e.pointerId)}catch(_){}redraw();e.preventDefault()});
+    c.addEventListener("pointermove",function(e){if(!drawing) return;var p=pt(e);strokes[strokes.length-1].push(p);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;e.preventDefault()});
+    ["pointerup","pointercancel"].forEach(function(t){c.addEventListener(t,function(){drawing=false})});
+    $("#clr").onclick=function(){strokes=[];has=false;redraw()};
+    $("#sf").onsubmit=function(e){
+      e.preventDefault();var nm=$("#nm").value.trim(),msg=$("#msg");
+      var say=function(t){msg.textContent=t;msg.className="err"};
+      if(!nm){say("Please enter your full name.");$("#nm").focus();return}
+      if(!has){say("Please sign in the box.");c.focus();return}
+      if(!$("#ok").checked){say("Please tick the confirmation box.");return}
+      var r=c.getBoundingClientRect(),sc=Math.min(1,700/r.width),out=document.createElement("canvas");
+      out.width=Math.round(r.width*sc);out.height=Math.round(r.height*sc);var o=out.getContext("2d");o.fillStyle="#fff";o.fillRect(0,0,out.width,out.height);o.drawImage(c,0,0,out.width,out.height);
+      var b=$("#go");b.disabled=true;msg.className="muted";msg.textContent="Submitting…";
+      api("apiHandoverSign",[token,nm,out.toDataURL("image/png"),true]).then(function(h){render(h);window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"})})
+        .catch(function(err){b.disabled=false;say(err.message)});
+    };
+  }
+  function fail(t){$("#app").innerHTML='<h1>We couldn\'t open this handover</h1><p class="err">'+esc(t)+'</p><p class="muted">Please check the link in your email, or reply to that email and we\'ll help.</p>'}
+  if(!token){fail("This link is incomplete.");return}
+  api("apiHandoverView",[token]).then(render).catch(function(e){fail(e.message)});
+})();
+</script>
+</body>
+</html>
