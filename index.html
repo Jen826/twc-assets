@@ -143,7 +143,7 @@ pre.sample{background:var(--sunk);border-radius:var(--r);padding:10px;font-famil
 .selbar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);align-self:center;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--ink);color:var(--bg);padding:8px 10px 8px 16px;border-radius:999px;box-shadow:0 8px 28px rgb(0 0 0 / .25)}
 .selbar .btn{border-radius:999px}
 .label-card.void .qr{opacity:.18;filter:grayscale(1)}.label-card.void .big{text-decoration:line-through;opacity:.6}
-.docfile{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:12.5px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0}.docfile.new{color:var(--ink)}.docrow{display:flex;align-items:center;gap:4px}
+.docfile{display:inline-block;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;font-size:12.5px;color:var(--accent);text-decoration:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;margin:2px 4px 2px 0}.docfile.new{color:var(--ink)}.st-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.st-sum>div{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--surface)}.st-sum b{display:block;font-size:24px;line-height:1.1}.st-sum b small{font-size:14px;color:var(--muted);font-weight:600}.st-sum span{font-size:13px;color:var(--muted)}.st-sum .bad{border-color:var(--bad);background:var(--bad-soft)}.st-sum .bad b{color:var(--bad)}.st-sum .warn{border-color:var(--warn);background:var(--warn-soft)}.docrow{display:flex;align-items:center;gap:4px}
 
 .check{display:flex;gap:8px;align-items:center;cursor:pointer}
 .report-list{margin:0;padding-left:20px;color:var(--muted);font-size:14px;display:grid;gap:3px}
@@ -376,7 +376,7 @@ async function call(fn,...args){
   return j.result;
 }
 const clone=o=>o===undefined?undefined:JSON.parse(JSON.stringify(o));
-const COLS=["units","properties","assets","products","vendors","inventories","transfers","counters","documents"];
+const COLS=["units","properties","assets","products","vendors","inventories","transfers","counters","documents","stocktakes"];
 const M={};COLS.forEach(c=>M[c]=new Map());
 let serverTime=0,code=LS("code");
 const listeners=new Set();          // {kind,col,path,q,cb}
@@ -796,6 +796,7 @@ function renderUnitView(v){
   const counts={};S.assets.forEach(a=>counts[a.status]=(counts[a.status]||0)+1);
   const notSeen=S.assets.filter(a=>a.status!=="Disposed"&&(daysAgo(a.verifiedAt)===null||daysAgo(a.verifiedAt)>180)).length;
   if(S.unitTab==="stock") return renderUnitStock(v,u);
+  if(S.unitTab==="stocktakes") return renderUnitStocktakes(v,u);
   const rows=filtered();
   const keepFocus=document.activeElement?.id==="assetSearch";
   v.innerHTML=`<div class="pagehead"><div><button class="linkback" onclick="selectUnit('${u.property?"__prop:"+esc(u.property):""}')">← ${esc(propName(u.property))}</button><h2>${esc(u.name)}</h2><div class="sub"><span class="tagchip">${esc(u.code)}</span> &nbsp;<span class="num">${S.assets.length}</span> tagged items${notSeen?` · <span class="stale">${notSeen} not verified in 6 months</span>`:""}</div></div>
@@ -1446,10 +1447,23 @@ async function buildReport(scope,incDisposed,status){
   (S.transfers||[]).forEach(t=>(t.items||[]).forEach(i=>{
     if(!unitSet.has(t.to)&&!unitSet.has(i.from)) return;tfN++;
     const fu=S.units.find(u=>u.code===i.from)||{},tu=S.units.find(u=>u.code===t.to)||{};
-    tf.addRow({date:t.at?new Date(t.at):null,tag:i.tag,name:i.name,fp:propName(fu.property),fu:fu.name||i.from,tp:propName(tu.property),tu:tu.name||t.to,
+    tf.addRow({date:t.at?xlDate(t.at):null,tag:i.tag,name:i.name,fp:propName(fu.property),fu:fu.name||i.from,tp:propName(tu.property),tu:tu.name||t.to,
       floc:i.fromLocation||"",loc:t.location||"",note:t.note||"",by:who(t.by)})}));
   if(tfN) tf.autoFilter={from:{row:1,column:1},to:{row:tfN+1,column:11}};else tf.addRow({tag:"No transfers for this scope yet."});
   tf.views=[{state:"frozen",ySplit:1}];
+
+  // Stocktakes
+  let stAll=[];try{stAll=(await S.db.collection("stocktakes").limit(1000).get()).docs.map(d=>d.data()).filter(r=>r&&r.id&&unitSet.has(r.unit))}catch(e){}
+  const sts=wb.addWorksheet("Stocktakes");
+  sts.columns=[{header:"Date",key:"date",width:18,style:{numFmt:"dd mmm yyyy hh:mm"}},{header:"Property",key:"prop",width:18},{header:"Unit",key:"unit",width:22},{header:"Conducted by",key:"by",width:18},
+    {header:"Status",key:"status",width:12},{header:"Items expected",key:"total",width:10},{header:"Found",key:"found",width:9},{header:"Missing",key:"missing",width:9},
+    {header:"From other units",key:"wrong",width:10},{header:"Unknown / disposed labels",key:"unknown",width:12},{header:"Missing tags",key:"mtags",width:40},{header:"Notes",key:"note",width:32},{header:"Reference",key:"id",width:20}];
+  styleHead(sts.getRow(1));
+  stAll.sort((a,b)=>(b.startedAt||0)-(a.startedAt||0)).forEach(r=>{const s=stSummary(r);const row=sts.addRow({date:r.startedAt?xlDate(r.startedAt):null,prop:propName(propOfUnit(r.unit)),unit:unitLabel(r.unit),by:whoName(r.by),
+    status:r.status==="Completed"?"Completed":"Not finished",total:s.total,found:s.found,missing:s.missing,wrong:s.wrong+s.moved,unknown:s.unknown,mtags:(r.missing||[]).map(m=>m.tag).join(", "),note:r.note||"",id:r.id});
+    if(s.missing) row.getCell("missing").font={color:{argb:"FFB0362F"},bold:true}});
+  if(stAll.length) sts.autoFilter={from:{row:1,column:1},to:{row:stAll.length+1,column:13}};else sts.addRow({prop:"No stocktakes for this scope yet."});
+  sts.views=[{state:"frozen",ySplit:1}];
 
   // Documents
   const docsIn=(S.docs||[]).filter(d=>!scope||(d.unit&&unitSet.has(d.unit))||(d.inventory&&invsIn.some(i=>i.id===d.inventory)));
@@ -1635,7 +1649,8 @@ function renderUnitStock(v,u){
     b.innerHTML=stockTableHtml(rows.filter(r=>r.unit===u.code&&(r.here||r.movedOut||r.disposed)).sort((a,b)=>(prodById(a.pid)||{name:""}).name.localeCompare((prodById(b.pid)||{name:""}).name)));
     b.querySelector("tbody")?.addEventListener("click",e=>{const tr=e.target.closest("tr[data-pid]");if(tr) openProduct(tr.dataset.pid)})}).catch(fail);
 }
-function unitTabs(){return `<div class="tabs" role="tablist"><button role="tab" data-tab="items" aria-selected="${S.unitTab!=="stock"}">Tagged items</button><button role="tab" data-tab="stock" aria-selected="${S.unitTab==="stock"}">Stock by asset</button></div>`}
+function unitTabs(){return `<div class="tabs" role="tablist"><button role="tab" data-tab="items" aria-selected="${!S.unitTab||S.unitTab==="items"}">Tagged items</button><button role="tab" data-tab="stock" aria-selected="${S.unitTab==="stock"}">Stock by asset</button><button role="tab" data-tab="stocktakes" aria-selected="${S.unitTab==="stocktakes"}">Stocktakes</button></div>`}
+function unitTabsOld(){return `<div class="tabs" role="tablist"><button role="tab" data-tab="items" aria-selected="${S.unitTab!=="stock"}">Tagged items</button><button role="tab" data-tab="stock" aria-selected="${S.unitTab==="stock"}">Stock by asset</button></div>`}
 function wireUnitTabs(){document.querySelectorAll(".tabs [data-tab]").forEach(b=>b.onclick=()=>{S.unitTab=b.dataset.tab;S.selected.clear();renderView()})}
 
 /* ---------- Search ---------- */
@@ -1826,7 +1841,14 @@ function renderReprint(v){
 /* ---------- Stocktake ---------- */
 function openStocktake(){
   const unit=S.unit,u=S.units.find(x=>x.code===unit)||{code:unit,name:unit};
-  const st={found:new Set(),entries:[],busy:false};
+  const st={found:new Set(),entries:[],busy:false,info:{},moved:new Set(),marked:[],started:Date.now(),id:"ST-"+localDay().replace(/-/g,"")+"-"+Date.now().toString(36).slice(-5).toUpperCase(),saving:Promise.resolve()};
+  const stRecord=()=>{const act=active(),tags=[...st.found],uniq=f=>[...new Set(st.entries.filter(f).map(e=>e.tag))];
+    return {id:st.id,unit,date:localDay(),startedAt:st.started,finishedAt:st.done?Date.now():null,status:st.done?"Completed":"In progress",by:S.me||null,total:act.length,
+      found:act.filter(a=>st.found.has(a.tag)).map(a=>a.tag),
+      missing:act.filter(a=>!st.found.has(a.tag)).map(a=>({tag:a.tag,name:a.name||"",location:a.location||"",lastVerified:a.verifiedAt||null})),
+      wrongUnit:tags.filter(t=>st.info[t]&&st.info[t].unit!==unit).map(t=>({tag:t,name:st.info[t].name,from:st.info[t].unit,moved:st.moved.has(t)})),
+      notInRegister:uniq(e=>/not in the register/.test(e.text)),disposedLabels:uniq(e=>/was disposed/.test(e.text)),markedMissing:st.marked,note:st.note||""}};
+  const persist=()=>{if(!st.entries.length) return st.saving;const rec=stRecord();st.saving=st.saving.then(()=>S.db.doc("stocktakes/"+st.id).set(rec)).catch(e=>console.warn("stocktake save",e));return st.saving};
   const active=()=>S.assets.filter(a=>a.unit===unit&&a.status!=="Disposed");
   modal(`<h3>Stocktake · ${esc(unitLabel(unit))}</h3>
    <p class="hint" style="margin:0">Walk the floor and scan each label. Every scan marks that item as verified today. Tap <b>Scan with camera</b> and sweep the room, or use a handheld scanner: the box stays ready.</p>
@@ -1838,7 +1860,7 @@ function openStocktake(){
    <ul class="log st-log" id="stList"></ul>
    <details class="notfound" id="stMissing"><summary>Not found yet (<span id="stMC">0</span>)</summary><ul id="stML"></ul>
      <button class="btn danger" data-write id="stMark" type="button">Mark these as Missing</button></details>
-   <div class="row-end"><button class="btn" data-close>Finish stocktake</button></div>`);
+   <div class="row-end"><button class="btn primary" type="button" id="stDone">Finish stocktake</button></div>`);
   const input=$("#stInput");input.focus();
   function draw(){
     const act=active(),n=act.filter(a=>st.found.has(a.tag)).length,t=act.length,pct=t?Math.round(n/t*100):0;
@@ -1856,7 +1878,7 @@ function openStocktake(){
       if(st.found.has(tag)){st.entries.unshift({time,tag,cls:"warn",text:"already scanned"});return}
       const snap=await S.db.doc("assets/"+tag).get();
       if(!snap.exists){st.entries.unshift({time,tag,cls:"bad",text:"is not in the register"});return}
-      const a=snap.data();
+      const a=snap.data();st.info[tag]={name:a.name||"",location:a.location||"",unit:a.unit};
       if(a.status==="Disposed"){st.entries.unshift({time,tag,cls:"bad",text:"was disposed"+(a.disposedOn?" on "+fmtDate(Date.parse(a.disposedOn+"T00:00:00")):"")+" · this label is deactivated, please remove it"});return}
       await S.db.doc("assets/"+tag).update({verifiedAt:Date.now(),verifiedBy:S.me||null,...(a.status==="Missing"?{status:"In use"}:{})});
       await logEvent(tag,`Verified in stocktake${a.status==="Missing"?" (was Missing)":""}`);
@@ -1867,26 +1889,99 @@ function openStocktake(){
       if(a.needsLabel) notes.push("label is on the reprint list");
       st.entries.unshift({time,tag,cls:a.unit!==unit?"warn":"ok",text:"found · "+notes.join(" · "),moveFrom:a.unit!==unit?a.unit:null});
     }catch(e){writeErr(e)}
-    finally{st.busy=false;draw();input.value="";if(!Scanner.isOpen()) input.focus()}
+    finally{st.busy=false;draw();persist();input.value="";if(!Scanner.isOpen()) input.focus()}
   }
   $("#stForm").onsubmit=e=>{e.preventDefault();scan(input.value)};
   $("#stList").addEventListener("click",async e=>{const b=e.target.closest("[data-move]");if(!b) return;b.disabled=true;b.textContent="Moving…";
     try{await transferItems([b.dataset.move],unit,"","Found here during stocktake");const en=st.entries.find(x=>x.tag===b.dataset.move);
-      if(en){en.moveFrom=null;en.cls="ok";en.text+=` · moved to ${unitLabel(unit)}`}toast(`${b.dataset.move} moved here`)}catch(err){writeErr(err)}
+      if(en){en.moveFrom=null;en.cls="ok";en.text+=` · moved to ${unitLabel(unit)}`}st.moved.add(b.dataset.move);persist();toast(`${b.dataset.move} moved here`)}catch(err){writeErr(err)}
     draw();input.focus()});
   $("#stCam").onclick=()=>Scanner.open({continuous:true,title:"Stocktake · "+unitLabel(unit),hint:"Scan each label. Found items are ticked off as you go.",
     onCode:async tag=>{await scan(tag);const e=st.entries[0],n=active().filter(a=>st.found.has(a.tag)).length;
       return {text:(e?`${e.tag} ${e.text}`:tag)+`\n${n} of ${active().length} found`,bad:e&&e.cls==="bad"}}});
   $("#stPhoto").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f) return;toast("Reading QR code…");const t=await decodePhoto(f);if(t){$("#toast").hidden=true;scan(t)}};
+  $("#stDone").onclick=async()=>{
+    if(!st.entries.length){closeOverlay();return}
+    const b=$("#stDone");b.disabled=true;b.textContent="Saving…";st.done=true;
+    try{if(window.Scanner&&Scanner.isOpen()) Scanner.close()}catch(e){}
+    await persist();openStocktakeRecord(stRecord());
+  };
   $("#stMark").onclick=async e=>{
     const b=e.currentTarget,miss=active().filter(a=>!st.found.has(a.tag));
     if(!b.dataset.armed){b.dataset.armed="1";b.textContent=`Confirm: mark ${miss.length} as Missing`;return}
     b.disabled=true;
     try{for(const a of miss){if(a.status==="Missing") continue;await S.db.doc("assets/"+a.tag).update({status:"Missing",updatedAt:Date.now(),updatedBy:S.me||null});await logEvent(a.tag,`Status ${a.status} → Missing (not found in stocktake)`)}
-      toast(`${miss.length} marked Missing`)}catch(err){writeErr(err)}
+      st.marked=[...new Set([...st.marked,...miss.map(a=>a.tag)])];persist();toast(`${miss.length} marked Missing`)}catch(err){writeErr(err)}
     b.disabled=false;draw();
   };
   draw();
+}
+
+/* ---------- Stocktake records & report ---------- */
+const whoName=id=>id?(String(id).startsWith("n:")?String(id).slice(2)||"Unknown":nameOf(id)):"";
+const xlDate=ms=>new Date(ms-new Date(ms).getTimezoneOffset()*60000);
+const fmtTime=ms=>ms?new Date(ms).toLocaleTimeString(undefined,{hour:"2-digit",minute:"2-digit"}):"";
+function stSummary(r){return {total:r.total||0,found:(r.found||[]).length,missing:(r.missing||[]).length,wrong:(r.wrongUnit||[]).filter(x=>!x.moved).length,
+  moved:(r.wrongUnit||[]).filter(x=>x.moved).length,unknown:(r.notInRegister||[]).length+(r.disposedLabels||[]).length}}
+const stItemName=t=>{const a=(S.assets||[]).find(x=>x.tag===t)||(S.itemsByTag||{})[t];return a?a.name:""};
+function openStocktakeRecord(r){
+  const s=stSummary(r),pct=s.total?Math.round(s.found/s.total*100):0;
+  const li=(arr,f)=>arr.map(f).join("");
+  modal(`<h3>Stocktake · ${esc(unitLabel(r.unit))}</h3>
+   <p class="muted" style="margin:0;font-size:14px">${esc(fmtDate(r.startedAt))} · ${esc(fmtTime(r.startedAt))}${r.finishedAt?"–"+esc(fmtTime(r.finishedAt)):""} · by ${esc(whoName(r.by))}${r.status==="Completed"?"":` · <span class="stale">Not finished</span>`}</p>
+   <div class="st-sum"><div><b class="num">${s.found}<small> / ${s.total}</small></b><span>Found (${pct}%)</span></div><div class="${s.missing?"bad":""}"><b class="num">${s.missing}</b><span>Missing</span></div>
+     <div class="${s.wrong?"warn":""}"><b class="num">${s.wrong+s.moved}</b><span>From other units${s.moved?` (${s.moved} moved here)`:""}</span></div><div class="${s.unknown?"warn":""}"><b class="num">${s.unknown}</b><span>Unknown or disposed labels</span></div></div>
+   ${s.missing?`<div><span class="eyebrow">Missing</span><ul class="report-list">${li(r.missing,m=>`<li><span class="tagchip">${esc(m.tag)}</span> ${esc(m.name)} <span class="muted">· ${esc(m.location||"no location")}${(r.markedMissing||[]).includes(m.tag)?" · marked Missing":""}</span></li>`)}</ul></div>`:""}
+   ${(r.wrongUnit||[]).length?`<div><span class="eyebrow">Found here but recorded in another unit</span><ul class="report-list">${li(r.wrongUnit,w=>`<li><span class="tagchip">${esc(w.tag)}</span> ${esc(w.name)} <span class="muted">· recorded in ${esc(unitLabel(w.from))}${w.moved?" · moved here":""}</span></li>`)}</ul></div>`:""}
+   ${(r.notInRegister||[]).length||(r.disposedLabels||[]).length?`<div><span class="eyebrow">Labels that need attention</span><ul class="report-list">${li(r.notInRegister||[],t=>`<li><span class="tagchip">${esc(t)}</span> <span class="muted">not in the register</span></li>`)}${li(r.disposedLabels||[],t=>`<li><span class="tagchip">${esc(t)}</span> <span class="muted">disposed item, label should be removed</span></li>`)}</ul></div>`:""}
+   ${s.found?`<details class="notfound"><summary>Found (${s.found})</summary><ul class="report-list">${li(r.found,t=>`<li><span class="tagchip">${esc(t)}</span> ${esc(stItemName(t))}</li>`)}</ul></details>`:""}
+   <div class="field"><label for="stNote">Notes</label><input id="stNote" value="${esc(r.note||"")}" placeholder="e.g. Move-out check with tenant, 2 chairs taken by tenant"></div>
+   <div class="row-end"><button class="btn" data-close>Close</button><button class="btn primary" id="stPrint">Download report</button></div>`);
+  const note=$("#stNote");note.onchange=async()=>{r.note=note.value.trim().slice(0,1000);try{await S.db.doc("stocktakes/"+r.id).update({note:r.note});toast("Note saved")}catch(e){writeErr(e)}};
+  $("#stPrint").onclick=async()=>{r.note=note.value.trim().slice(0,1000);if(!S.dl){toast("Downloads aren't available in this view");return}
+    try{await S.dl.save({filename:`stocktake-${r.unit}-${String(r.date||localDay())}.html`,data:stocktakeReportHtml(r)})}catch(e){if(e.code!=="declined") toast("Couldn't download: "+e.message)}};
+}
+function stocktakeReportHtml(r){
+  const s=stSummary(r),u=S.units.find(x=>x.code===r.unit)||{};
+  const row=c=>`<tr>${c.map(x=>`<td>${x}</td>`).join("")}</tr>`;
+  const table=(head,rows)=>rows.length?`<table><thead><tr>${head.map(h=>`<th>${h}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table>`:`<p class="none">None</p>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Stocktake report ${esc(unitLabel(r.unit))} ${esc(fmtDate(r.startedAt))}</title><style>
+@page{size:A4;margin:14mm}body{font:11pt/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:#111;margin:0}
+h1{font-size:18pt;margin:0 0 2mm}h2{font-size:12pt;margin:7mm 0 2mm;border-bottom:0.3mm solid #999;padding-bottom:1mm}
+.meta{display:grid;grid-template-columns:38mm 1fr;gap:1mm 4mm;margin:4mm 0}.meta dt{color:#555}.meta dd{margin:0;font-weight:600}
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin:4mm 0}.sum div{border:0.3mm solid #bbb;border-radius:2mm;padding:3mm}.sum b{display:block;font-size:18pt}.sum .bad{border-color:#b0362f;color:#b0362f}
+table{width:100%;border-collapse:collapse;font-size:10pt}th,td{text-align:left;padding:1.5mm 2mm;border-bottom:0.2mm solid #ccc;vertical-align:top}th{background:#f2f2f2}
+.mono{font-family:Menlo,Consolas,monospace}.none{color:#666;margin:0}.note{white-space:pre-wrap}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:12mm;margin-top:14mm}.sign div{border-top:0.3mm solid #333;padding-top:2mm;font-size:9.5pt;color:#333}
+.tip{font:10pt system-ui;background:#fff6d6;padding:3mm;border-radius:2mm;margin-bottom:5mm}@media print{.tip{display:none}}
+</style></head><body><p class="tip">Use your browser's Print (Ctrl+P / Share → Print) to print or save as PDF.</p>
+<h1>Stocktake report</h1><div>TWC · ${esc(propName(u.property))} · ${esc(u.name||r.unit)}</div>
+<dl class="meta"><dt>Unit</dt><dd>${esc(unitLabel(r.unit))} (${esc(r.unit)})</dd><dt>Date</dt><dd>${esc(fmtDate(r.startedAt))}, ${esc(fmtTime(r.startedAt))}${r.finishedAt?" – "+esc(fmtTime(r.finishedAt)):""}</dd>
+<dt>Conducted by</dt><dd>${esc(whoName(r.by))}</dd><dt>Status</dt><dd>${r.status==="Completed"?"Completed":"Not finished"}</dd><dt>Reference</dt><dd class="mono">${esc(r.id)}</dd>${r.note?`<dt>Notes</dt><dd class="note">${esc(r.note)}</dd>`:""}</dl>
+<div class="sum"><div><b>${s.found} / ${s.total}</b>Found</div><div class="${s.missing?"bad":""}"><b>${s.missing}</b>Missing</div><div><b>${s.wrong+s.moved}</b>From other units</div><div><b>${s.unknown}</b>Unknown / disposed labels</div></div>
+<h2>Missing items (${s.missing})</h2>${table(["Tag","Item","Recorded location","Last verified before"],(r.missing||[]).map(m=>row([`<span class="mono">${esc(m.tag)}</span>`,esc(m.name),esc(m.location||""),esc(m.lastVerified?fmtDate(m.lastVerified):"Never")])))}
+<h2>Found here but recorded in another unit (${(r.wrongUnit||[]).length})</h2>${table(["Tag","Item","Recorded in","Action"],(r.wrongUnit||[]).map(w=>row([`<span class="mono">${esc(w.tag)}</span>`,esc(w.name),esc(unitLabel(w.from)),w.moved?"Moved to this unit":"Not moved"])))}
+<h2>Labels that need attention (${(r.notInRegister||[]).length+(r.disposedLabels||[]).length})</h2>${table(["Label","Issue"],[...(r.notInRegister||[]).map(t=>row([`<span class="mono">${esc(t)}</span>`,"Not in the register"])),...(r.disposedLabels||[]).map(t=>row([`<span class="mono">${esc(t)}</span>`,"Item was disposed, remove the label"]))])}
+<h2>Items found (${s.found})</h2>${table(["Tag","Item"],(r.found||[]).map(t=>row([`<span class="mono">${esc(t)}</span>`,esc(stItemName(t))])))}
+<div class="sign"><div>Conducted by (name, signature, date)</div><div>Acknowledged by tenant / unit representative (name, signature, date)</div></div>
+</body></html>`;
+}
+function renderUnitStocktakes(v,u){
+  v.innerHTML=`<div class="pagehead"><div><button class="linkback" onclick="selectUnit('${u.property?"__prop:"+esc(u.property):""}')">← ${esc(propName(u.property))}</button><h2>${esc(u.name)}</h2><div class="sub"><span class="tagchip">${esc(u.code)}</span></div></div>
+    <div class="actions"><button class="btn primary" data-write id="stStart2" ${S.assets.length?"":"disabled"}>Start stocktake</button></div></div>
+    ${unitTabs()}<div id="stHist"><div class="empty"><h3>Loading stocktakes…</h3></div></div>`;
+  wireUnitTabs();$("#stStart2").onclick=openStocktake;applyWriteGate();
+  S.db.collection("stocktakes").where("unit","==",u.code).limit(500).get().then(sn=>{
+    if(S.unit!==u.code||S.unitTab!=="stocktakes") return;const b=$("#stHist");if(!b) return;
+    const rows=sn.docs.map(d=>d.data()).filter(r=>r&&r.id).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0));S.stHist=rows;
+    b.innerHTML=rows.length?`<div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>By</th><th style="text-align:right">Found</th><th style="text-align:right">Missing</th><th style="text-align:right">Other units</th><th>Status</th></tr></thead><tbody>
+      ${rows.map(r=>{const s=stSummary(r);return `<tr data-st="${esc(r.id)}"><td class="num" style="white-space:nowrap">${esc(fmtDate(r.startedAt))} <span class="muted">${esc(fmtTime(r.startedAt))}</span></td><td>${esc(whoName(r.by))}</td>
+        <td class="num mono" style="text-align:right">${s.found}/${s.total}</td><td class="num mono" style="text-align:right;${s.missing?"color:var(--bad);font-weight:700":""}">${s.missing}</td><td class="num mono" style="text-align:right">${s.wrong+s.moved||""}</td>
+        <td>${r.status==="Completed"?`<span class="pill s-inuse"><span class="dot"></span>Completed</span>`:`<span class="pill s-repair"><span class="dot"></span>Not finished</span>`}</td></tr>`}).join("")}
+      </tbody></table></div><p class="hint" style="margin:0">Tap a stocktake to see what was missing and download a printable report, for example for a tenant move-out.</p>`
+      :`<div class="empty"><h3>No stocktakes yet</h3><p>Tap <b>Start stocktake</b> and scan every label in this unit. Each stocktake is saved here with what was found, missing or in the wrong unit, ready to print.</p></div>`;
+    b.querySelector("tbody")?.addEventListener("click",e=>{const tr=e.target.closest("tr[data-st]");if(tr) openStocktakeRecord(rows.find(x=>x.id===tr.dataset.st))});
+  }).catch(fail);
 }
 
 /* ---------- Overlays ---------- */
