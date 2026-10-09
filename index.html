@@ -121,7 +121,7 @@ table.ledger{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
 .label-card{display:grid;grid-template-columns:112px 1fr;gap:14px;align-items:center;background:linear-gradient(135deg,var(--tag),var(--surface));border:1px solid var(--line);border-radius:8px;padding:14px}
 .label-card .qr{background:#fff;padding:6px;border-radius:4px;line-height:0}
 .label-card .qr svg{width:100px;height:100px}
-.label-card .big{font-family:var(--f-mono);font-weight:600;font-size:22px;letter-spacing:.04em}
+.label-card.notag{grid-template-columns:1fr}.label-card .big{font-family:var(--f-mono);font-weight:600;font-size:22px;letter-spacing:.04em}
 dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;font-size:14px}
 dl.facts dt{color:var(--muted)}
 dl.facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
@@ -584,11 +584,15 @@ function toast(msg){const t=$("#toast");t.textContent=msg;t.hidden=false;clearTi
 function writeErr(e){console.error(e);toast(e && (e.code==="not_granted"||/permission|denied/i.test(e.message||""))?"You have view-only access, so changes can't be saved.":"Couldn't save: "+(e?.message||"unknown error"))}
 
 const localDay=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
-/* ---------- Tag format: TWC-BRAND-MODEL-0001 ---------- */
+/* ---------- Tag format: TWC-TBL-0001 (tables, desks), TWC-CHR-0001 (chairs), TWC-MSC-0001 (everything else) ---------- */
 const COMPANY_CODE="TWC";
 const tagPart=(v,n)=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,n);
 function tagPrefix(brand,model,fallback){return [COMPANY_CODE,tagPart(brand,10)||"GEN",tagPart(model,12)||tagPart(fallback,12)||"ITEM"].join("-")}
-/** Next free tag for a prefix, using a shared counter so numbers keep counting up per brand + model. */
+/** Product type code for new tags, worked out from the asset type (or the name when no type is set). */
+function typeCode(type,name){const pick=s=>/chair/.test(s)?"CHR":/table|desk/.test(s)?"TBL":"";const t=String(type||"").toLowerCase();
+  return (t?pick(t):pick(String(name||"").toLowerCase()))||"MSC"}
+const typePrefix=(type,name)=>COMPANY_CODE+"-"+typeCode(type,name);
+/** Next free tag for a prefix, using a shared counter so numbers keep counting up per product type. */
 async function nextTagFor(prefix){
   const ref=S.db.doc("counters/"+prefix);
   let n=((await ref.get()).data()||{}).next||1;
@@ -777,8 +781,8 @@ function renderView(){
     v.innerHTML=`<div class="empty">
       <span class="eyebrow">Getting started</span>
       <h3>Set up your properties and units</h3>
-      <p>Every asset belongs to a unit inside a property. Each tagged item gets a label with your company code, the brand, model and a running number, e.g. <span class="tagchip">TWC-ERGOLINE-ELTC200-0042</span>.</p>
-      <ol class="steps"><li>Add your properties and units (paste the whole list at once).</li><li>Add assets one by one, or import a spreadsheet per unit.</li><li>Download a label sheet, print it and stick a QR label on each item.</li><li>Scan a label with any phone camera to open that asset here.</li></ol>
+      <p>Every asset belongs to a unit inside a property. Each tagged item gets a label with your company code, the product type and a running number, e.g. <span class="tagchip">TWC-CHR-0042</span> for a chair, <span class="tagchip">TWC-TBL-0007</span> for a table or desk and <span class="tagchip">TWC-MSC-0015</span> for anything else.</p>
+      <ol class="steps"><li>Add your properties and units (paste the whole list at once).</li><li>Add assets one by one, or import a spreadsheet per unit.</li><li>Download a label sheet, print it and stick a label on each item.</li><li>Scan a label with any phone camera to open that asset here.</li></ol>
       <button class="btn primary" data-write onclick="openAddUnits()">Add properties and units</button></div>`;
     applyWriteGate();return;
   }
@@ -834,7 +838,7 @@ function renderUnitView(v){
       <select id="catFilter" aria-label="Category"><option value="">All categories</option>${[...new Set(S.assets.map(a=>a.category).filter(Boolean))].sort().map(c=>`<option ${S.filter.cat===c?"selected":""}>${esc(c)}</option>`).join("")}</select></div>
     <div class="ledger-wrap"><table class="ledger"><thead><tr><th class="chk"><input type="checkbox" id="selAll" aria-label="Select all shown" ${rows.length&&rows.every(r=>S.selected.has(r.tag))?"checked":""}></th><th class="thc"><span class="sr">Photo</span></th><th>Tag</th><th>Item</th><th>Category</th><th>Location</th><th>Status</th><th>Last verified</th></tr></thead>
     <tbody>${rows.map(a=>{const d=daysAgo(a.verifiedAt);return `<tr data-tag="${esc(a.tag)}"><td class="chk"><input type="checkbox" data-sel="${esc(a.tag)}" ${S.selected.has(a.tag)?"checked":""} aria-label="Select ${esc(a.tag)}"></td><td class="thc">${(()=>{const ap=assetPhotos(a);return ap.ids.length?photoImg(ap.ids[0],120,"athumb"+(ap.own?"":" cat")):`<span class="athumb none" aria-hidden="true"></span>`})()}</td><td style="white-space:nowrap"><span class="tagchip">${esc(a.tag)}</span>${a.needsLabel?`<span class="relabel" title="Label ${esc((a.labelIssue||"").toLowerCase())}, needs reprinting">Relabel</span>`:""}</td><td>${esc(a.name)}</td><td class="muted">${esc(a.category)}</td><td>${esc(a.location)}</td><td><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></td><td class="${d===null||d>180?"stale":"muted"} num">${a.verifiedAt?fmtDate(a.verifiedAt):"Never"}</td></tr>`}).join("")||`<tr><td colspan="8" class="muted" style="padding:20px">No assets match these filters.</td></tr>`}</tbody></table></div>`
-    : S.assetsLoading?`<div class="empty"><h3>Loading assets…</h3></div>`:`<div class="empty"><h3>No items in ${esc(u.name)} yet</h3><p>Create an inventory for this unit: pick assets (or create new ones), set quantities, then create QR tags. Each item gets a tag like <span class="tagchip">TWC-BRAND-MODEL-0001</span>.</p><div class="actions"><button class="btn primary" data-write onclick="S.invFilter={unit:S.unit,status:''};newInventory()">+ New inventory</button><button class="btn" data-write onclick="openImport()">Import CSV</button></div></div>`}
+    : S.assetsLoading?`<div class="empty"><h3>Loading assets…</h3></div>`:`<div class="empty"><h3>No items in ${esc(u.name)} yet</h3><p>Create an inventory for this unit: pick assets (or create new ones), set quantities, then create tags. Each item gets a tag like <span class="tagchip">TWC-BRAND-MODEL-0001</span>.</p><div class="actions"><button class="btn primary" data-write onclick="S.invFilter={unit:S.unit,status:''};newInventory()">+ New inventory</button><button class="btn" data-write onclick="openImport()">Import CSV</button></div></div>`}
     ${S.selected.size?`<div class="selbar"><span><b class="num">${S.selected.size}</b> selected</span><button class="btn primary" id="labelsBtn">Download labels</button><button class="btn" data-write id="bulkXfer">Transfer</button><button class="btn" data-write id="bulkStatus">Set status</button><button class="btn" data-write id="bulkDisp">Dispose</button><button class="btn ghost" id="clearSel" style="color:inherit">Clear</button></div>`:""}`;
   const q=$("#assetSearch");if(q){q.oninput=e=>{S.filter.q=e.target.value;renderView()};if(keepFocus){q.focus();q.setSelectionRange(q.value.length,q.value.length)}}
   const cf=$("#catFilter");if(cf) cf.onchange=e=>{S.filter.cat=e.target.value;renderView()};
@@ -952,7 +956,7 @@ function openAssetForm(a){
       photos:pp.photos.slice(0,6),updatedAt:Date.now(),updatedBy:S.me||null};
     try{
       if(isNew){
-        const unit=$("#f-unit").value;const {tag,seq}=await nextTag(unit);
+        const unit=$("#f-unit").value,seq=0,tag=await nextTagFor(typePrefix("",data.name));
         await S.db.doc("assets/"+tag).set({...data,tag,unit,createdAt:Date.now(),createdBy:S.me||null,verifiedAt:Date.now(),verifiedBy:S.me||null});
         await bumpUnit(unit,seq,1);await logEvent(tag,`Created in ${unit}${data.location?" at "+data.location:""}`);
         closeOverlay();toast(`Created ${tag}`);openAsset(tag);
@@ -995,7 +999,7 @@ function showDetail(a,update){
   const d=daysAgo(a.verifiedAt);
   const html=`<div class="sheet" id="detail" role="dialog" aria-label="Asset ${esc(a.tag)}">
     <div class="sheet-head"><div><span class="eyebrow">${esc(unitLabel(a.unit))}</span><h3>${esc(a.name)}</h3></div><button class="btn ghost" data-close aria-label="Close">✕</button></div>
-    <div class="label-card${a.status==="Disposed"?" void":""}"><div class="qr">${qrSvg(qrPayload(a.tag))}</div><div><div class="big">${esc(a.tag)}</div><div class="muted" style="font-size:13px">${esc(a.category)}</div><div style="margin-top:6px"><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></div></div></div>
+    <div class="label-card notag${a.status==="Disposed"?" void":""}"><div><div class="big">${esc(a.tag)}</div><div class="muted" style="font-size:13px">${esc(a.category)}</div><div style="margin-top:6px"><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></div></div></div>
     ${(()=>{const ap=assetPhotos(a);return ap.ids.length?`<div id="aGal">${photoGallery(ap.ids,ap.own?"":`General photo of ${esc(ap.product.name)}. Add a photo of this piece to show its actual condition.`)}</div>`:""})()}
     <div class="verify"><div><b>Last verified</b><div class="${d===null||d>180?"stale":"muted"}" style="font-size:13px">${a.verifiedAt?`${fmtDate(a.verifiedAt)} (${d===0?"today":d+" days ago"})${a.verifiedBy?" by "+esc(nameOf(a.verifiedBy)):""}`:"Never"}</div></div>
       ${a.status==="Disposed"?"":`<button class="btn primary" data-write id="verifyBtn">Confirm it's here</button>`}</div>
@@ -1008,7 +1012,7 @@ function showDetail(a,update){
       ${a.cost?`<dt>Cost</dt><dd class="num">${esc(a.cost)}</dd>`:""}
       ${a.notes?`<dt>Notes</dt><dd style="white-space:pre-wrap">${esc(a.notes)}</dd>`:""}
     </dl>
-    ${a.status==="Disposed"?`<div class="flag"><div><b>QR label deactivated: item disposed${a.disposalMethod?" ("+esc(a.disposalMethod)+")":""}</b><div class="muted" style="font-size:13px">${[a.disposedOn?fmtDate(Date.parse(a.disposedOn+"T00:00:00")):"",a.disposedBy?"by "+esc(nameOf(a.disposedBy)):"",a.disposalNote?esc(a.disposalNote):""].filter(Boolean).join(" · ")||"No disposal details recorded"}</div><div style="font-size:13px;margin-top:4px">If you find this item or its label, remove the label. Undo disposal to reactivate it.</div></div></div>`:""}
+    ${a.status==="Disposed"?`<div class="flag"><div><b>Label deactivated: item disposed${a.disposalMethod?" ("+esc(a.disposalMethod)+")":""}</b><div class="muted" style="font-size:13px">${[a.disposedOn?fmtDate(Date.parse(a.disposedOn+"T00:00:00")):"",a.disposedBy?"by "+esc(nameOf(a.disposedBy)):"",a.disposalNote?esc(a.disposalNote):""].filter(Boolean).join(" · ")||"No disposal details recorded"}</div><div style="font-size:13px;margin-top:4px">If you find this item or its label, remove the label. Undo disposal to reactivate it.</div></div></div>`:""}
     ${a.needsLabel?`<div class="flag"><div><b>Label ${esc((a.labelIssue||"damaged").toLowerCase())}</b><div class="muted" style="font-size:13px">Reported ${esc(fmtDate(a.labelReportedAt))}${a.labelReportedBy?" by "+esc(nameOf(a.labelReportedBy)):""}${a.labelNote?" · "+esc(a.labelNote):""}</div></div><button class="btn" data-write id="relabelledBtn">New label attached</button></div>`:""}
     ${a.status==="Disposed"?`<div class="actions"><button class="btn primary" data-write id="undoDispBtn">Undo disposal</button><button class="btn ghost danger" data-write id="delBtn">Delete</button></div>`:""}<div class="actions"${a.status==="Disposed"?" hidden":""}><button class="btn primary" data-write id="xferBtn">Transfer</button><button class="btn" data-write id="editBtn">Edit</button>${S.assetsCap?`<label class="btn" data-write id="qPhotoBtn">Add photo<input type="file" id="qPhoto" accept="image/\x2a" capture="environment" hidden></label>`:""}<button class="btn" id="oneLabel">Download label</button>${a.needsLabel?"":`<button class="btn" data-write id="reportLabel">Report label problem</button>`}${a.status==="Disposed"?"":`<button class="btn danger" data-write id="dispBtn">Dispose</button><button class="btn ghost danger" data-write id="delBtn">Delete</button>`}</div>
     <div><span class="eyebrow">History</span><ul class="log" id="logList" style="margin-top:8px"><li class="muted">Loading…</li></ul></div>
@@ -1058,7 +1062,7 @@ function openDispose(items){
    <div class="field"><label for="dpHow">How was it disposed? <span class="req">*</span></label><select id="dpHow"><option value="">Choose one</option>${DISPOSAL_METHODS.map(m=>`<option>${esc(m)}</option>`).join("")}</select></div>
    <div class="field"><label for="dpDate">Date disposed</label><input id="dpDate" type="date" value="${localDay()}" max="${localDay()}"></div>
    <div class="field"><label for="dpNote">Reason or note</label><input id="dpNote" placeholder="e.g. Broken frame, sold to staff for SGD 20, approved by facilities"></div>
-   <p class="hint" style="margin:0">${one?"The item stays":"The items stay"} in the register with full history, marked Disposed. Disposed items no longer count in the unit, stock or stocktakes. Its QR label is deactivated: scanning it shows the item as disposed, and it can't be transferred, verified or reprinted. You can undo this later.</p>
+   <p class="hint" style="margin:0">${one?"The item stays":"The items stay"} in the register with full history, marked Disposed. Disposed items no longer count in the unit, stock or stocktakes. Its label is deactivated: looking it up shows the item as disposed, and it can't be transferred, verified or reprinted. You can undo this later.</p>
    <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn danger" id="dpGo" disabled>Dispose</button></div>`);
   const how=$("#dpHow"),go=$("#dpGo");
   how.onchange=()=>{go.disabled=!how.value;go.textContent=one?"Dispose":`Dispose ${items.length} items`};
@@ -1081,7 +1085,7 @@ function openDispose(items){
 }
 function undoDispose(a){
   const to=a.disposedFrom&&a.disposedFrom!=="Disposed"?a.disposedFrom:"In use";
-  modal(`<h3>Undo disposal of ${esc(a.tag)}?</h3><p style="margin:0">${esc(a.name)} goes back to <b>${esc(to)}</b> in ${esc(unitLabel(a.unit))}. Its QR label works again. The disposal stays in its history.</p>
+  modal(`<h3>Undo disposal of ${esc(a.tag)}?</h3><p style="margin:0">${esc(a.name)} goes back to <b>${esc(to)}</b> in ${esc(unitLabel(a.unit))}. Its label works again. The disposal stays in its history.</p>
    <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="udGo">Undo disposal</button></div>`);
   $("#udGo").onclick=async()=>{const b=$("#udGo");b.disabled=true;
     try{await S.db.doc("assets/"+a.tag).update({status:to,disposedFrom:"",disposalMethod:"",disposedOn:"",disposalNote:"",disposedAt:null,disposedBy:null,updatedAt:Date.now(),updatedBy:S.me||null});
@@ -1227,7 +1231,7 @@ async function exportCsv(){
 }
 function openImport(){
   modal(`<h3>Import assets into ${esc(S.unit)}</h3>
-   <p class="hint" style="margin:0">Upload a CSV saved from Excel or Google Sheets. The first row must be headers. Only <b>name</b> is required. Add <b>brand</b> and <b>model</b> columns so new tags read like TWC-BRAND-MODEL-0001; leave <b>tag</b> blank to assign new tags, or fill it to keep tags you already use.</p>
+   <p class="hint" style="margin:0">Upload a CSV saved from Excel or Google Sheets. The first row must be headers. Only <b>name</b> is required. New tags read like TWC-CHR-0001, TWC-TBL-0001 or TWC-MSC-0001, based on the item name; leave <b>tag</b> blank to assign new tags, or fill it to keep tags you already use.</p>
    <pre class="sample">name,category,location,status,condition,serial,notes
 Meeting table 8-seat,Furniture,L3 Room 3.02,In use,Good,,
 Fiddle-leaf fig,Plants,L3 Reception,In use,Good,,Water weekly</pre>
@@ -1254,7 +1258,7 @@ Fiddle-leaf fig,Plants,L3 Reception,In use,Good,,Water weekly</pre>
         let tag=o.tag;
         if(tag){if((await S.db.doc("assets/"+tag).get()).exists){skipped++;continue}
         }
-        else tag=await nextTagFor(tagPrefix(o.brand,o.model));
+        else tag=await nextTagFor(typePrefix(o.type,o.name));
         const now=Date.now();
         await S.db.doc("assets/"+tag).set({...o,tag,unit,createdAt:now,createdBy:S.me||null,updatedAt:now,updatedBy:S.me||null});
         done++;b.textContent=`Importing ${done}/${items.length}…`;
@@ -1287,17 +1291,21 @@ function openReport(){
      <li><b>Transfers</b>: every move between properties and units, with dates and notes</li>
      <li><b>Assets</b>: every asset with its photo, category, type, brand, colour, vendor and price</li></ul>
    <div class="field"><label for="rpScope">Properties and units</label><select id="rpScope"><option value="">All properties (${S.units.length} units, ${total.toLocaleString()} assets)</option>${groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="P:${esc(g.prop)}" ${!S.unit&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)} (${g.units.length} units)</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)} (${u.count||0})</option>`).join("")}</optgroup>`).join("")}</select></div>
+   <div class="field"><label for="rpType">Asset type</label><select id="rpType"><option value="">All asset types</option></select><div class="hint">Pick a type, e.g. Chair, to report only on those assets.</div></div>
    <label class="check"><input type="checkbox" id="rpDisposed"> Include disposed assets</label>
    <div class="hint" id="rpStatus" aria-live="polite"></div>
    <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="rpGo">Build Excel report</button></div>`);
   loadExcel().catch(()=>{});
+  loadCatalog().then(()=>{const sel=$("#rpType");if(!sel) return;const seen=new Map();
+    (S.cat?S.cat.products:[]).forEach(p=>{const t=String(p.type||"").trim();if(t&&!seen.has(t.toLowerCase())) seen.set(t.toLowerCase(),t)});
+    sel.innerHTML=`<option value="">All asset types</option>`+[...seen.values()].sort((a,b)=>a.localeCompare(b)).map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}).catch(()=>{});
   $("#rpGo").onclick=async()=>{
     const b=$("#rpGo"),st=$("#rpStatus");b.disabled=true;
-    try{await buildReport($("#rpScope").value,$("#rpDisposed").checked,t=>st.textContent=t);closeOverlay()}
+    try{await buildReport($("#rpScope").value,$("#rpDisposed").checked,t=>st.textContent=t,$("#rpType").value);closeOverlay()}
     catch(e){if(e&&e.code==="declined"){st.textContent="Download cancelled."}else{st.textContent="Couldn't build the report: "+(e?.message||e)}b.disabled=false}
   };
 }
-async function buildReport(scope,incDisposed,status){
+async function buildReport(scope,incDisposed,status,ptype){
   if(!S.dl) throw new Error("downloads aren't available in this view");
   const units=groupedUnits(scope?(scope.startsWith("P:")?S.units.filter(u=>u.property===scope.slice(2)):S.units.filter(u=>u.code===scope)):S.units).flatMap(g=>g.units);
   const propOfUnit=c=>(S.units.find(u=>u.code===c)||{}).property||"";
@@ -1308,7 +1316,12 @@ async function buildReport(scope,incDisposed,status){
     if(snap.size>=1000) capped.push(units[i].code);
     all.push(...snap.docs.map(d=>d.data()));
   }
-  const assets=(incDisposed?all:all.filter(a=>a.status!=="Disposed"))
+  await loadCatalog();
+  const PT=String(ptype||"").trim().toLowerCase(),prodT={};(S.cat?S.cat.products:[]).forEach(p=>prodT[p.id]=String(p.type||"").trim().toLowerCase());
+  const pidOk=id=>!PT||prodT[id]===PT,nameOk=n=>String(n||"").toLowerCase().includes(PT);
+  const typeOk=a=>!PT||(a.productId&&prodT[a.productId]!==undefined?prodT[a.productId]===PT:nameOk(a.name));
+  const tagKnown=new Set(all.map(a=>a.tag)),tagTyped=new Set(all.filter(typeOk).map(a=>a.tag));
+  const assets=(incDisposed?all:all.filter(a=>a.status!=="Disposed")).filter(typeOk)
     .sort((a,b)=>a.unit.localeCompare(b.unit)||a.tag.localeCompare(b.tag,undefined,{numeric:true}));
   status("Looking up names…");
   const ids=[...new Set(assets.flatMap(a=>[a.verifiedBy,a.updatedBy,a.labelReportedBy]).filter(Boolean))];
@@ -1333,7 +1346,7 @@ async function buildReport(scope,incDisposed,status){
   const sm=wb.addWorksheet("Summary",{views:[{showGridLines:false}]});
   sm.columns=[{width:22},{width:14},{width:28},{width:11},{width:10},{width:11},{width:12},{width:10},{width:10},{width:14},{width:14},{width:12},{width:15}];
   sm.getCell("A1").value="Asset inventory report";sm.getCell("A1").font={bold:true,size:18};
-  sm.getCell("A2").value=`Scope: ${scopeLabel}${incDisposed?"":" (disposed assets excluded)"}`;
+  sm.getCell("A2").value=`Scope: ${scopeLabel}${PT?" · asset type: "+ptype:""}${incDisposed?"":" (disposed assets excluded)"}`;
   sm.getCell("A3").value=`Generated ${now.toLocaleString(undefined,{day:"numeric",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"})}${S.myName?" by "+S.myName:""}`;
   sm.getCell("A4").value=`${assets.length.toLocaleString()} assets in ${units.length} unit${units.length===1?"":"s"} across ${new Set(units.map(u=>u.property||"")).size} propert${new Set(units.map(u=>u.property||"")).size===1?"y":"ies"}`;
   ["A2","A3","A4"].forEach(k=>sm.getCell(k).font={color:{argb:"FF5D666E"}});
@@ -1420,7 +1433,7 @@ async function buildReport(scope,incDisposed,status){
   const prodsById={};(S.cat?S.cat.products:[]).forEach(p=>prodsById[p.id]=p);
   const unitSet=new Set(units.map(u=>u.code));
   const invsIn=(S.invDocs||[]).filter(i=>unitSet.has(i.unit));
-  const stockRows=(await computeStock(true)).filter(r=>unitSet.has(r.unit)&&(r.here||r.movedOut||r.disposed));
+  const stockRows=(await computeStock(true)).filter(r=>unitSet.has(r.unit)&&(r.here||r.movedOut||r.disposed)&&pidOk(r.pid));
   const ib=wb.addWorksheet("Inventory by unit");
   ib.columns=[{header:"Property",key:"prop",width:18},{header:"Unit code",key:"unit",width:12},{header:"Unit",key:"uname",width:20},{header:"Asset ID",key:"pid",width:10},
     {header:"Asset",key:"name",width:30},{header:"Category",key:"category",width:14},{header:"Asset type",key:"type",width:14},
@@ -1448,7 +1461,7 @@ async function buildReport(scope,incDisposed,status){
     {header:`Unit price (${CURRENCY})`,key:"price",width:14,style:{numFmt:MONEY}},{header:`Line value (${CURRENCY})`,key:"value",width:14,style:{numFmt:MONEY}}];
   styleHead(il.getRow(1));
   let ilN=0;
-  [...invsIn].sort((a,b)=>a.id.localeCompare(b.id)).forEach(i=>(i.lines||[]).forEach(l=>{const p=prodsById[l.productId]||{name:"(deleted asset)",price:0};ilN++;
+  [...invsIn].sort((a,b)=>a.id.localeCompare(b.id)).forEach(i=>(i.lines||[]).filter(l=>pidOk(l.productId)).forEach(l=>{const p=prodsById[l.productId]||{name:"(deleted asset)",price:0};ilN++;
     il.addRow({inv:i.id,iname:i.name,date:pDate(i.date),status:i.status,prop:propName(propOfUnit(i.unit)),unit:i.unit,uname:(S.units.find(u=>u.code===i.unit)||{}).name||i.unit,pid:l.productId,name:p.name,brand:p.brand||"",colour:p.colour||"",
       qty:+l.qty||0,location:l.location||"",notes:l.notes||"",tagged:Math.min(+l.tagged||0,+l.qty||0),...(()=>{const x=lineStatus(i,l);return {lhere:x.here,lmoved:x.moved||null,ldisp:x.disposed||null}})(),tags:tagList(l.tags).join(", "),price:p.price||0,value:(p.price||0)*(+l.qty||0)})}));
   if(ilN) il.autoFilter={from:{row:1,column:1},to:{row:ilN+1,column:21}};else il.addRow({inv:"No inventory lines for this scope yet."});
@@ -1464,7 +1477,8 @@ async function buildReport(scope,incDisposed,status){
   styleHead(tf.getRow(1));
   let tfN=0;
   (S.transfers||[]).forEach(t=>(t.items||[]).forEach(i=>{
-    if(!unitSet.has(t.to)&&!unitSet.has(i.from)) return;tfN++;
+    if(!unitSet.has(t.to)&&!unitSet.has(i.from)) return;
+    if(PT&&!(tagTyped.has(i.tag)||(!tagKnown.has(i.tag)&&nameOk(i.name)))) return;tfN++;
     const fu=S.units.find(u=>u.code===i.from)||{},tu=S.units.find(u=>u.code===t.to)||{};
     tf.addRow({date:t.at?xlDate(t.at):null,tag:i.tag,name:i.name,fp:propName(fu.property),fu:fu.name||i.from,tp:propName(tu.property),tu:tu.name||t.to,
       floc:i.fromLocation||"",loc:t.location||"",note:t.note||"",by:who(t.by)})}));
@@ -1505,7 +1519,7 @@ async function buildReport(scope,incDisposed,status){
     {header:"Vendor",key:"vendor",width:20},{header:`Price (${CURRENCY})`,key:"price",width:12,style:{numFmt:MONEY}},{header:"Unit of measure",key:"uom",width:10},
     {header:"Description",key:"desc",width:36},{header:"Active",key:"active",width:9},{header:"Qty in inventories",key:"inuse",width:12}];
   styleHead(pc.getRow(1));
-  const plist=(S.cat?S.cat.products:[]).slice().sort((a,b)=>a.category.localeCompare(b.category)||a.name.localeCompare(b.name));
+  const plist=(S.cat?S.cat.products:[]).filter(p=>pidOk(p.id)).sort((a,b)=>a.category.localeCompare(b.category)||a.name.localeCompare(b.name));
   let imgFail=0,imgN=0;
   for(const p of plist){
     const r=pc.addRow({pid:p.id,name:p.name,category:p.category,type:p.type,brand:p.brand,model:p.model,colour:p.colour,vendor:p.vendor,price:p.price,uom:p.uom,
@@ -1525,7 +1539,7 @@ async function buildReport(scope,incDisposed,status){
 
   status("Saving…");
   const buf=await wb.xlsx.writeBuffer();
-  const fname=`Inventory report - ${(!scope?"All properties":scope.startsWith("P:")?propName(scope.slice(2)):unitLabel(scope)).replace(/[\\/:*?"<>|]/g,"-")} - ${localDay()}.xlsx`;
+  const fname=`Inventory report - ${(!scope?"All properties":scope.startsWith("P:")?propName(scope.slice(2)):unitLabel(scope)).replace(/[\\/:*?"<>|]/g,"-")}${PT?" - "+String(ptype).replace(/[\\/:*?"<>|]/g,"-"):""} - ${localDay()}.xlsx`;
   await S.dl.save({filename:fname,data:new Blob([buf])});
   toast(`Report saved: ${assets.length} assets`+(capped.length?` (first 1,000 only for ${capped.join(", ")})`:""));
 }
@@ -1535,14 +1549,15 @@ async function downloadLabels(list){
   list=(list||[]).filter(a=>a&&a.status!=="Disposed");
   if(!list.length){toast("No labels to download: disposed items' labels are deactivated");return}
   if(!S.dl){toast("Downloads aren't available in this view");return}
-  const cells=list.map(a=>`<div class="lbl"><div class="q">${qrSvg(qrPayload(a.tag))}</div><div class="t"><div class="tag">${esc(a.tag)}</div><div class="nm">${esc(a.name)}</div><div class="u">${esc(unitLabel(a.unit))}</div><div class="p">Company property · scan to view</div></div></div>`).join("");
+  const cells=list.map(a=>`<div class="lbl"><div class="co">TWC · Company property</div><div class="tag${String(a.tag).length>13?" long":""}">${esc(a.tag)}</div><div class="nm">${esc(a.name)}</div><div class="u">${esc(unitLabel(a.unit))}</div></div>`).join("");
   const doc=`<!doctype html><html><head><meta charset="utf-8"><title>Asset labels</title><style>
 @page{size:A4;margin:10mm}body{margin:0;font-family:Menlo,Consolas,monospace;color:#000}
 .note{font:13px system-ui,sans-serif;margin:0 0 6mm}@media print{.note{display:none}}
 .sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:38.1mm;gap:0 2.5mm}
-.lbl{box-sizing:border-box;border:0.2mm dashed #bbb;padding:3mm;display:grid;grid-template-columns:26mm 1fr;gap:2.5mm;align-items:center;overflow:hidden;break-inside:avoid}
-.q svg{width:26mm;height:26mm;display:block}.tag{font-weight:700;font-size:13pt;letter-spacing:.03em}
-.nm{font:9pt/1.2 system-ui,sans-serif;max-height:2.4em;overflow:hidden}.u{font:7.5pt system-ui,sans-serif;color:#444;margin-top:1mm}.p{font:6.5pt system-ui,sans-serif;color:#666;margin-top:1mm}
+.lbl{box-sizing:border-box;border:0.2mm dashed #bbb;padding:3mm 4mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:1.2mm;overflow:hidden;break-inside:avoid}
+.co{font:700 7pt system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#444}
+.tag{font-weight:700;font-size:17pt;letter-spacing:.04em;white-space:nowrap}.tag.long{font-size:10pt;letter-spacing:0}
+.nm{font:8.5pt/1.2 system-ui,sans-serif;max-height:2.4em;overflow:hidden}.u{font:7pt system-ui,sans-serif;color:#444}
 </style></head><body><p class="note">${list.length} label${list.length>1?"s":""} laid out for A4 sheets of 3×7 labels (63.5 × 38.1 mm). Print at 100% scale (actual size). Dashed lines are cutting guides.</p><div class="sheet">${cells}</div></body></html>`;
   try{await S.dl.save({filename:list.length===1?`label-${list[0].tag}.html`:`labels-${list.length}.html`,data:doc});toast("Open the file and print it")}catch(e){if(e.code!=="declined") toast("Couldn't download: "+e.message)}
 }
@@ -1710,7 +1725,7 @@ function renderSearch(v){
   const T=r.tagged.slice(0,300);
   v.innerHTML=`<div class="pagehead"><div><span class="eyebrow">Search</span><h2>“${esc(S.q)}”</h2><div class="sub"><span class="num">${r.tagged.length}</span> tagged item${r.tagged.length===1?"":"s"} · <span class="num">${r.prods.length}</span> asset${r.prods.length===1?"":"s"}</div></div>
     <div class="actions"><button class="btn" id="srClear">Clear search</button></div></div>
-    ${!r.tagged.length&&!r.prods.length?`<div class="empty"><h3>Nothing matches “${esc(S.q)}”</h3><p>Try part of a tag (e.g. TWC-ERGOLINE), an asset name, category, vendor, brand, model or asset type.</p></div>`:""}
+    ${!r.tagged.length&&!r.prods.length?`<div class="empty"><h3>Nothing matches “${esc(S.q)}”</h3><p>Try part of a tag (e.g. TWC-CHR or 0042), an asset name, category, vendor, brand, model or asset type.</p></div>`:""}
     ${r.tagged.length?`<h3 class="h3">Tagged items</h3><div class="ledger-wrap"><table class="ledger"><thead><tr><th class="thc"><span class="sr">Photo</span></th><th>Tag</th><th>Item</th><th>Where</th><th>Location</th><th>Status</th></tr></thead><tbody>
       ${T.map(a=>{const ap=assetPhotos(a);return `<tr data-tag="${esc(a.tag)}"><td class="thc">${ap.ids.length?photoImg(ap.ids[0],120,"athumb"+(ap.own?"":" cat")):`<span class="athumb none" aria-hidden="true"></span>`}</td><td style="white-space:nowrap"><span class="tagchip">${esc(a.tag)}</span></td><td>${esc(a.name)}</td><td>${esc(unitLabel(a.unit))}</td><td class="muted">${esc(a.location)}</td><td><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></td></tr>`}).join("")}
       </tbody></table></div>${r.tagged.length>T.length?`<p class="hint">Showing the first ${T.length}. Add another word to narrow the search.</p>`:""}`:""}
@@ -2370,7 +2385,7 @@ async function tagInventory(id,progress){
     if(need<=0||!p) continue;
     const newTags=[];
     for(let i=0;i<need;i++){
-      const tag=await nextTagFor(tagPrefix(p.brand,p.model,p.id));
+      const tag=await nextTagFor(typePrefix(p.type,p.name));
       const a={tag,brand:p.brand||"",model:p.model||"",unit:inv.unit,name:p.name+(p.colour?` (${p.colour})`:""),category:p.category||"Other",location:l.location||"",status:"In use",condition:"New",
         serial:p.model||"",purchased:inv.date||"",cost:p.price?String(p.price):"",notes:[p.brand,p.vendor?"Vendor: "+p.vendor:"",`From ${inv.id} ${inv.name}`].filter(Boolean).join(" · "),
         productId:p.id,createdAt:now,createdBy:S.me||null,updatedAt:now,updatedBy:S.me||null,verifiedAt:now,verifiedBy:S.me||null};
@@ -2609,7 +2624,7 @@ function renderInventories(v){
           const r=d.lines.reduce((t,l)=>{const x=lineStatus(d,l);return {here:t.here+x.here+Math.max(0,(+l.qty||0)-(+l.tagged||0)),moved:t.moved+x.moved,disp:t.disp+x.disposed}},{here:0,moved:0,disp:0});
           return `${r.here}${r.moved||r.disp?`<div class="muted" style="font-size:12px">${[r.moved?r.moved+" moved":"",r.disp?r.disp+" disposed":""].filter(Boolean).join(" · ")}</div>`:""}`})()}</td><td class="num" style="text-align:right;white-space:nowrap">${money(i.value)}</td></tr>`).join("")}
     </tbody></table></div>`
-    :`<div class="empty"><h3>${S.invs.length?"No inventories match":"No inventories yet"}</h3><p>An inventory is a list of assets placed in one unit, such as "Initial fit-out" or "Q4 plant refresh". Pick assets (or create new ones), set quantities and locations, then create QR tags for them when you're ready.</p>${S.units.length?`<button class="btn primary" onclick="newInventory()">+ New inventory</button>`:`<p class="hint" style="margin:0">Add a business unit first.</p>`}</div>`}`;
+    :`<div class="empty"><h3>${S.invs.length?"No inventories match":"No inventories yet"}</h3><p>An inventory is a list of assets placed in one unit, such as "Initial fit-out" or "Q4 plant refresh". Pick assets (or create new ones), set quantities and locations, then create tags for them when you're ready.</p>${S.units.length?`<button class="btn primary" onclick="newInventory()">+ New inventory</button>`:`<p class="hint" style="margin:0">Add a business unit first.</p>`}</div>`}`;
   if(!S.itemsByTag&&rows.length) loadAllItems().then(()=>{if(S.view==="inventories") renderView()}).catch(()=>{});
   $("#ifUnit").onchange=e=>{S.invFilter.unit=e.target.value;renderView()};
   $("#ifStatus").onchange=e=>{S.invFilter.status=e.target.value;renderView()};
@@ -2647,7 +2662,7 @@ function renderInvEditor(v){
   v.innerHTML=`<div class="pagehead"><div><button class="linkback" id="ieBack">← Inventories</button><h2>${saved?esc(inv.name||inv.id):"New inventory"}</h2>
       <div class="sub">${saved?`<span class="tagchip">${esc(inv.id)}</span> · `:""}<span class="num">${t.items}</span> items · ${money(t.value)}${t.tagged?` · ${t.tagged} tagged`:""}${S.dirty?` · <span class="stale">Unsaved changes</span>`:""}</div></div>
     <div class="actions"><button class="btn primary" data-write id="ieSave">${saved?"Save changes":"Save inventory"}</button>
-      ${saved&&t.untagged?`<button class="btn" data-write id="ieTag">Create QR tags (${t.untagged})</button>`:""}
+      ${saved&&t.untagged?`<button class="btn" data-write id="ieTag">Create tags (${t.untagged})</button>`:""}
       ${saved&&t.tagged?`<button class="btn" id="ieLabels">Download labels</button>`:""}
       ${saved&&!t.tagged?`<button class="btn ghost danger" data-write id="ieDel">Delete</button>`:""}</div></div>
     <section class="panel"><div class="grid4">
@@ -2670,7 +2685,7 @@ function renderInvEditor(v){
           return x.moved||x.disposed?`<div class="lmoves">${x.moved?`<span class="mv">${x.moved} moved to ${Object.keys(x.where).map(w=>esc((S.units.find(u=>u.code===w)||{}).name||w)).join(", ")}</span>`:""}${x.disposed?`<span class="dp">${x.disposed} disposed</span>`:""}</div>`:""})()}`:"—"}</td>
         <td><button class="btn ghost" data-rm="${i}" ${tg?`disabled title="Already tagged"`:""} aria-label="Remove line">✕</button></td></tr>`}).join("")}
       </tbody><tfoot><tr><td><b>Total</b></td><td class="num"><b>${t.items}</b></td><td></td><td></td><td class="num" style="text-align:right;white-space:nowrap"><b>${money(t.value)}</b></td><td class="muted num">${t.tagged}/${t.items}</td><td></td></tr></tfoot></table></div>
-      <p class="hint" style="margin:0">Quantities are kept as a list. When you're ready to label items individually, save and use <b>Create QR tags</b>: each untagged piece gets its own QR tag in ${esc(unitName(inv.unit))}, linked to the asset.</p>`
+      <p class="hint" style="margin:0">Quantities are kept as a list. When you're ready to label items individually, save and use <b>Create tags</b>: each untagged piece gets its own tag in ${esc(unitName(inv.unit))}, linked to the asset.</p>`
     :`<div class="empty"><h3>No assets yet</h3><p>Add assets from your list, or create new ones, then set a quantity and location for each.</p><div class="actions"><button class="btn primary" onclick="openPicker()">+ Add assets</button><button class="btn" data-write onclick="newAssetForInventory()">+ New asset</button></div></div>`}`;
   const mark=()=>{if(!S.dirty){S.dirty=true;const sub=v.querySelector(".pagehead .sub");if(sub&&!/Unsaved/.test(sub.innerHTML)) sub.insertAdjacentHTML("beforeend",` · <span class="stale">Unsaved changes</span>`)}};
   [["ie-unit","unit"],["ie-name","name"],["ie-date","date"],["ie-status","status"],["ie-notes","notes"]].forEach(([id,k])=>{
@@ -2707,8 +2722,8 @@ async function saveInventory(then){
 }
 function confirmTag(){
   const t=invTotals(),inv=S.edit.inv;
-  modal(`<h3>Create ${t.untagged} QR tag${t.untagged===1?"":"s"}?</h3>
-   <p style="margin:0">Each untagged piece gets its own tagged record in <b>${esc(unitName(inv.unit))}</b> with its own tag in the form <span class="tagchip">TWC-BRAND-MODEL-0001</span>, using the asset's name, colour, category, price and the line's location. You can then download their labels to print.</p>
+  modal(`<h3>Create ${t.untagged} tag${t.untagged===1?"":"s"}?</h3>
+   <p style="margin:0">Each untagged piece gets its own tagged record in <b>${esc(unitName(inv.unit))}</b> with its own tag in the form <span class="tagchip">TWC-CHR-0001</span> (chairs), <span class="tagchip">TWC-TBL-0001</span> (tables and desks) or <span class="tagchip">TWC-MSC-0001</span> (everything else), using the asset's name, colour, category, price and the line's location. You can then download their labels to print.</p>
    <ul class="report-list">${S.edit.lines.filter(l=>(l.qty-(l.tagged||0))>0).map(l=>{const p=prodById(l.productId)||{name:l.productId};return `<li>${l.qty-(l.tagged||0)} × ${esc(p.name)}${l.location?` <span class="muted">· ${esc(l.location)}</span>`:""}</li>`}).join("")}</ul>
    <div class="row-end"><button class="btn" data-close>Cancel</button><button class="btn primary" id="tgGo">Create ${t.untagged} tag${t.untagged===1?"":"s"}</button></div>`);
   $("#tgGo").onclick=async()=>{
