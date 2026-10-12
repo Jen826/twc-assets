@@ -121,7 +121,7 @@ table.ledger{width:100%;border-collapse:collapse;font-size:14px;min-width:760px}
 .label-card{display:grid;grid-template-columns:112px 1fr;gap:14px;align-items:center;background:linear-gradient(135deg,var(--tag),var(--surface));border:1px solid var(--line);border-radius:8px;padding:14px}
 .label-card .qr{background:#fff;padding:6px;border-radius:4px;line-height:0}
 .label-card .qr svg{width:100px;height:100px}
-.label-card.notag{grid-template-columns:1fr}.label-card .big{font-family:var(--f-mono);font-weight:600;font-size:22px;letter-spacing:.04em}
+.label-card.notag{grid-template-columns:1fr}.label-card .bcard{background:#fff;padding:6px 8px;border-radius:4px;line-height:0;max-width:340px;margin-bottom:8px}.label-card .bcard svg{width:100%;height:56px;display:block}.label-card.void .bcard{opacity:.18}.label-card .big{font-family:var(--f-mono);font-weight:600;font-size:22px;letter-spacing:.04em}
 dl.facts{display:grid;grid-template-columns:max-content 1fr;gap:6px 16px;margin:0;font-size:14px}
 dl.facts dt{color:var(--muted)}
 dl.facts dd{margin:0;min-width:0;overflow-wrap:anywhere}
@@ -315,7 +315,7 @@ img{max-width:100%}
 #cam{position:fixed;inset:0;z-index:55;background:#000;color:#fff}
 #cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .cam-frame{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
-.cam-frame i{width:min(70vw,320px);aspect-ratio:1;border-radius:18px;border:3px solid rgb(255 255 255 / .9);box-shadow:0 0 0 100vmax rgb(0 0 0 / .42);transition:border-color .15s}
+.cam-frame i{width:min(86vw,440px);aspect-ratio:2.4;border-radius:14px;border:3px solid rgb(255 255 255 / .9);box-shadow:0 0 0 100vmax rgb(0 0 0 / .42);transition:border-color .15s}
 #cam.hit .cam-frame i{border-color:#6cc68e}
 .cam-top,.cam-bottom{position:absolute;left:0;right:0;display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 16px}
 .cam-top{top:0;padding-top:calc(env(safe-area-inset-top,0px) + 12px);font-weight:600;text-shadow:0 1px 3px rgb(0 0 0 / .6)}
@@ -333,13 +333,13 @@ img{max-width:100%}
   <header class="top">
     <div class="brand"><h1>Assets &amp; Inventory</h1><small id="connState">connecting…</small></div>
     <form class="scan" id="scanForm" autocomplete="off">
-      <input id="scanInput" placeholder="Scan QR, or search tag, name, category, vendor, type" aria-label="Search by tag, name, category, vendor or type" enterkeyhint="search" type="search">
+      <input id="scanInput" placeholder="Scan barcode, or search tag, name, category, vendor, type" aria-label="Search by tag, name, category, vendor or type" enterkeyhint="search" type="search">
       <button class="btn" type="submit">Search</button>
-      <button class="btn primary" type="button" id="camBtn" title="Scan a QR label with the camera">
+      <button class="btn primary" type="button" id="camBtn" title="Scan a barcode label with the camera">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8V5a1 1 0 0 1 1-1h3M16 4h3a1 1 0 0 1 1 1v3M20 16v3a1 1 0 0 1-1 1h-3M8 20H5a1 1 0 0 1-1-1v-3"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
         <span>Scan</span>
       </button>
-      <label class="btn" title="Take or choose a photo of a QR label" aria-label="Photo of a QR label">
+      <label class="btn" title="Take or choose a photo of a barcode label" aria-label="Photo of a barcode label">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
         <input type="file" id="photoInput" accept="image/*" capture="environment" hidden>
       </label>
@@ -366,8 +366,6 @@ img{max-width:100%}
 <div id="overlay"></div>
 <div id="toast" class="toast" hidden></div>
 
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 /* Google bridge: provides the same db / user / downloads / assets functions the app uses, backed by the Google Sheet.
    All records (except item history) are mirrored in the browser, so screens are instant; writes are queued and saved in
@@ -558,7 +556,7 @@ window.TWC_APP_URL=APP_URL;
 
 </script>
 <script>
-// Link each QR label opens. Set after first publish.
+// Base link for ?tag= deep links.
 const ARTIFACT_URL = location.origin + location.pathname;
 
 const CATEGORIES = ["Furniture","Plants","IT equipment","Appliances","Fixtures & fittings","Other"];
@@ -617,7 +615,7 @@ function unitCodeFrom(name){
   return (w.map(x=>/\d/.test(x)?x:x[0]).join("")||"U").slice(0,8);
 }
 
-/* ---------- QR ---------- */
+/* ---------- Tag links ---------- */
 function qrPayload(tag){return ARTIFACT_URL ? ARTIFACT_URL+"?tag="+encodeURIComponent(tag) : tag}
 function qrSvg(text){
   if(typeof qrcode!=="function") return "";
@@ -629,6 +627,40 @@ function parseScan(raw){
   const m=s.match(/[?&#]tag=([^&#]+)/i);
   if(m) s=decodeURIComponent(m[1]); else { const h=s.lastIndexOf("#"); if(h>=0) s=s.slice(h+1); }
   return s.toUpperCase().replace(/\s+/g,"");
+}
+
+/* ---------- Barcodes (Code 128) ---------- */
+const C128="11011001100110011011001100110011010010011000100100011001000100110010011001000100110001001000110010011001001000110010001001100010010010110011100100110111001001100111010111001100100111011001001110011011001110010110010111001100100111011011100100110011101001110110111011101001100111001011001110010011011101100100111001101001110011001011011011000110110001101100011011010100011000100010110001000100011010110001000100011010001000110001011010001000110001010001100010001010110111000101100011101000110111010111011000101110001101000111011011101110110110100011101100010111011011101000110111000101101110111011101011000111010001101110001011011101101000111011000101110001101011101111010110010000101111000101010100110000101000011001001011000010010000110100001011001000010011010110010000101100001001001101000010011000010100001101001000011001011000010010110010100001111011101011000010100100011110101010011110010010111100100100111101011110010010011110100100111100101111010010011110010100111100100101101101111011011110110111101101101010111100010100011110100010111101011110100010111100010111101010001111010001010111011110101111011101110101111011110101110110100001001101001000011010011100";
+/** SVG Code 128 (set B) barcode for a tag. Bars stretch to the box they sit in. */
+function code128Svg(text){
+  const s=String(text||"").replace(/[^\x20-\x7e]/g,"");if(!s) return "";
+  const v=[104];for(const ch of s) v.push(ch.charCodeAt(0)-32);
+  let sum=104;for(let i=1;i<v.length;i++) sum+=i*v[i];v.push(sum%103);
+  const bits="0".repeat(10)+v.map(n=>C128.substr(n*11,11)).join("")+"1100011101011"+"0".repeat(10);
+  let d="";for(let i=0;i<bits.length;){if(bits[i]==="1"){let j=i;while(bits[j]==="1") j++;d+=`M${i} 0h${j-i}v40h-${j-i}z`;i=j}else i++}
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${bits.length} 40" preserveAspectRatio="none" shape-rendering="crispEdges" role="img" aria-label="Barcode ${esc(s)}"><path fill="#000" d="${d}"/></svg>`;
+}
+/* Fallback barcode reader for browsers without a built-in one (e.g. iPhone Safari). Loaded only when needed. */
+let zxP=null,zxR=null;
+function loadZX(){
+  if(window.ZXing) return Promise.resolve(window.ZXing);
+  if(!zxP) zxP=new Promise((res,rej)=>{const sc=document.createElement("script");sc.src="https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js";
+    sc.onload=()=>window.ZXing?res(window.ZXing):rej(new Error("reader missing"));sc.onerror=()=>{zxP=null;sc.remove();rej(new Error("reader didn't load"))};document.head.appendChild(sc)});
+  return zxP;
+}
+async function zxDecode(canvas){
+  const Z=await loadZX();
+  if(!zxR){zxR=new Z.MultiFormatReader();const h=new Map();
+    h.set(Z.DecodeHintType.POSSIBLE_FORMATS,[Z.BarcodeFormat.CODE_128,Z.BarcodeFormat.CODE_39,Z.BarcodeFormat.QR_CODE]);h.set(Z.DecodeHintType.TRY_HARDER,true);zxR.setHints(h)}
+  try{const r=zxR.decodeWithState(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(canvas))));return r?r.getText():null}
+  catch(e){return null}finally{try{zxR.reset()}catch(e){}}
+}
+let bdP=null;
+/** Built-in barcode detector when the browser has one (Chrome on Android, Edge), else null. */
+function nativeDetector(){
+  if(!bdP) bdP=(async()=>{try{if(!("BarcodeDetector" in window)) return null;const sup=await BarcodeDetector.getSupportedFormats();
+    const f=["code_128","code_39","qr_code"].filter(x=>sup.includes(x));return f.includes("code_128")?new BarcodeDetector({formats:f}):null}catch(e){return null}})();
+  return bdP;
 }
 
 /* ---------- Units ---------- */
@@ -999,7 +1031,7 @@ function showDetail(a,update){
   const d=daysAgo(a.verifiedAt);
   const html=`<div class="sheet" id="detail" role="dialog" aria-label="Asset ${esc(a.tag)}">
     <div class="sheet-head"><div><span class="eyebrow">${esc(unitLabel(a.unit))}</span><h3>${esc(a.name)}</h3></div><button class="btn ghost" data-close aria-label="Close">✕</button></div>
-    <div class="label-card notag${a.status==="Disposed"?" void":""}"><div><div class="big">${esc(a.tag)}</div><div class="muted" style="font-size:13px">${esc(a.category)}</div><div style="margin-top:6px"><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></div></div></div>
+    <div class="label-card notag${a.status==="Disposed"?" void":""}"><div><div class="bcard">${code128Svg(a.tag)}</div><div class="big">${esc(a.tag)}</div><div class="muted" style="font-size:13px">${esc(a.category)}</div><div style="margin-top:6px"><span class="pill ${statusCls(a.status)}"><span class="dot"></span>${esc(a.status)}</span></div></div></div>
     ${(()=>{const ap=assetPhotos(a);return ap.ids.length?`<div id="aGal">${photoGallery(ap.ids,ap.own?"":`General photo of ${esc(ap.product.name)}. Add a photo of this piece to show its actual condition.`)}</div>`:""})()}
     <div class="verify"><div><b>Last verified</b><div class="${d===null||d>180?"stale":"muted"}" style="font-size:13px">${a.verifiedAt?`${fmtDate(a.verifiedAt)} (${d===0?"today":d+" days ago"})${a.verifiedBy?" by "+esc(nameOf(a.verifiedBy)):""}`:"Never"}</div></div>
       ${a.status==="Disposed"?"":`<button class="btn primary" data-write id="verifyBtn">Confirm it's here</button>`}</div>
@@ -1549,16 +1581,17 @@ async function downloadLabels(list){
   list=(list||[]).filter(a=>a&&a.status!=="Disposed");
   if(!list.length){toast("No labels to download: disposed items' labels are deactivated");return}
   if(!S.dl){toast("Downloads aren't available in this view");return}
-  const cells=list.map(a=>`<div class="lbl"><div class="co">TWC · Company property</div><div class="tag${String(a.tag).length>13?" long":""}">${esc(a.tag)}</div><div class="nm">${esc(a.name)}</div><div class="u">${esc(unitLabel(a.unit))}</div></div>`).join("");
+  const cells=list.map(a=>`<div class="lbl"><div class="co">TWC · Company property</div><div class="bc">${code128Svg(a.tag)}</div><div class="tag${String(a.tag).length>13?" long":""}">${esc(a.tag)}</div><div class="nm">${esc(a.name)}</div><div class="u">${esc(unitLabel(a.unit))}</div></div>`).join("");
   const doc=`<!doctype html><html><head><meta charset="utf-8"><title>Asset labels</title><style>
 @page{size:A4;margin:10mm}body{margin:0;font-family:Menlo,Consolas,monospace;color:#000}
 .note{font:13px system-ui,sans-serif;margin:0 0 6mm}@media print{.note{display:none}}
 .sheet{display:grid;grid-template-columns:repeat(3,63.5mm);grid-auto-rows:38.1mm;gap:0 2.5mm}
-.lbl{box-sizing:border-box;border:0.2mm dashed #bbb;padding:3mm 4mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:1.2mm;overflow:hidden;break-inside:avoid}
-.co{font:700 7pt system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#444}
-.tag{font-weight:700;font-size:17pt;letter-spacing:.04em;white-space:nowrap}.tag.long{font-size:10pt;letter-spacing:0}
-.nm{font:8.5pt/1.2 system-ui,sans-serif;max-height:2.4em;overflow:hidden}.u{font:7pt system-ui,sans-serif;color:#444}
-</style></head><body><p class="note">${list.length} label${list.length>1?"s":""} laid out for A4 sheets of 3×7 labels (63.5 × 38.1 mm). Print at 100% scale (actual size). Dashed lines are cutting guides.</p><div class="sheet">${cells}</div></body></html>`;
+.lbl{box-sizing:border-box;border:0.2mm dashed #bbb;padding:2.5mm 3mm;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:0.9mm;overflow:hidden;break-inside:avoid}
+.co{font:700 6.5pt system-ui,sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#444}
+.bc{width:100%;height:11mm;line-height:0}.bc svg{width:100%;height:100%;display:block}
+.tag{font-weight:700;font-size:13pt;letter-spacing:.04em;white-space:nowrap;line-height:1.1}.tag.long{font-size:9pt;letter-spacing:0}
+.nm{font:8pt/1.2 system-ui,sans-serif;max-height:1.2em;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}.u{font:7pt system-ui,sans-serif;color:#444}
+</style></head><body><p class="note">${list.length} label${list.length>1?"s":""} laid out for A4 sheets of 3×7 labels (63.5 × 38.1 mm). Print at 100% scale (actual size) so the barcodes scan. Dashed lines are cutting guides.</p><div class="sheet">${cells}</div></body></html>`;
   try{await S.dl.save({filename:list.length===1?`label-${list[0].tag}.html`:`labels-${list.length}.html`,data:doc});toast("Open the file and print it")}catch(e){if(e.code!=="declined") toast("Couldn't download: "+e.message)}
 }
 
@@ -1742,15 +1775,20 @@ $("#scanForm").onsubmit=async e=>{e.preventDefault();const raw=$("#scanInput").v
   runSearch(raw.includes("#")?t:raw);
 };
 async function decodePhoto(f){
-  if(typeof jsQR!=="function"){toast("The QR reader didn't load. Type the tag instead.");return null}
-  try{
-    const img=await createImageBitmap(f);const scale=Math.min(1,1600/Math.max(img.width,img.height));
-    const c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
-    const ctx=c.getContext("2d");ctx.drawImage(img,0,0,c.width,c.height);
-    const d=ctx.getImageData(0,0,c.width,c.height);const r=jsQR(d.data,c.width,c.height,{inversionAttempts:"attemptBoth"});
-    if(!r){toast("No QR code found. Try again closer and in good light, or type the tag.");return null}
-    return parseScan(r.data);
-  }catch(err){toast("Couldn't read that photo");return null}
+  let img;try{img=await createImageBitmap(f)}catch(err){toast("Couldn't read that photo");return null}
+  let raw=null;
+  const det=await nativeDetector();
+  if(det){try{const r=await det.detect(img);if(r&&r.length) raw=r[0].rawValue}catch(e){}}
+  if(!raw){
+    try{await loadZX()}catch(e){toast("The barcode reader didn't load. Check your connection, or type the tag.");return null}
+    for(const max of [1600,1000,2400]){
+      const scale=Math.min(1,max/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");c.width=Math.round(img.width*scale);c.height=Math.round(img.height*scale);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);raw=await zxDecode(c);if(raw) break;
+    }
+  }
+  if(!raw){toast("No barcode found. Hold the label flat, fill the photo with it in good light, or type the tag.");return null}
+  return parseScan(raw);
 }
 /* ---------- Live camera scanner ---------- */
 const Scanner=(()=>{
@@ -1771,7 +1809,7 @@ const Scanner=(()=>{
   function msg(t,bad){$c("#camMsg").textContent=t||"";el.classList.toggle("err",!!bad)}
   async function open(o){
     opts=o||{};ui();last={code:"",at:0};busy=false;torchOn=false;
-    el.hidden=false;$c("#camTitle").textContent=opts.title||"Point the camera at a QR label";msg(opts.hint||"");$c("#camTorch").hidden=true;
+    el.hidden=false;$c("#camTitle").textContent=opts.title||"Point the camera at a barcode label";msg(opts.hint||"");$c("#camTorch").hidden=true;
     if(!window.isSecureContext||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
       msg("This browser can't open the camera here. Use the camera-icon Photo button instead.",true);return}
     try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:{ideal:"environment"},width:{ideal:1280},height:{ideal:720}}})}
@@ -1784,19 +1822,18 @@ const Scanner=(()=>{
     if(el.hidden){stop();return}
     video.srcObject=stream;try{await video.play()}catch(e){}
     try{const tr=stream.getVideoTracks()[0],caps=tr.getCapabilities&&tr.getCapabilities();$c("#camTorch").hidden=!(caps&&caps.torch)}catch(e){}
-    if(!detectorTried){detectorTried=true;
-      try{if("BarcodeDetector" in window&&(await BarcodeDetector.getSupportedFormats()).includes("qr_code")) detector=new BarcodeDetector({formats:["qr_code"]})}catch(e){detector=null}}
+    if(!detectorTried){detectorTried=true;detector=await nativeDetector()}
+    if(!detector) loadZX().catch(()=>msg("The barcode reader didn't load. Check your connection, or type the tag.",true));
     running=true;tick();
   }
   async function readFrame(){
     if(video.readyState<2||!video.videoWidth) return null;
     if(detector){try{const r=await detector.detect(video);return r&&r.length?r[0].rawValue:null}catch(e){detector=null}}
-    if(typeof jsQR!=="function") return null;
-    const w=video.videoWidth,h=video.videoHeight,sc=Math.min(1,720/Math.max(w,h));
+    if(!window.ZXing) return null;
+    const w=video.videoWidth,h=video.videoHeight,sc=Math.min(1,960/Math.max(w,h));
     canvas.width=Math.round(w*sc);canvas.height=Math.round(h*sc);
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
-    const img=ctx.getImageData(0,0,canvas.width,canvas.height),r=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
-    return r?r.data:null;
+    return await zxDecode(canvas);
   }
   async function tick(){
     if(!running) return;
@@ -1829,7 +1866,7 @@ $("#camBtn").onclick=()=>Scanner.open({onCode:t=>openAsset(t)});
 
 $("#photoInput").onchange=async e=>{
   const f=e.target.files[0];e.target.value="";if(!f) return;
-  toast("Reading QR code…");const t=await decodePhoto(f);if(t) openAsset(t);
+  toast("Reading barcode…");const t=await decodePhoto(f);if(t) openAsset(t);
 };
 
 /* ---------- Label problems & reprint list ---------- */
@@ -1837,7 +1874,7 @@ function openReportLabel(a){
   modal(`<h3>Report label problem · ${esc(a.tag)}</h3>
    <p class="hint" style="margin:0">The item goes on the reprint list so someone can print and attach a new label with the same tag.</p>
    <div class="choice" role="radiogroup">
-     <label><input type="radio" name="li" value="Damaged" checked><span><b>Damaged</b><small>Torn, faded, or the QR code won't scan</small></span></label>
+     <label><input type="radio" name="li" value="Damaged" checked><span><b>Damaged</b><small>Torn, faded, or the barcode won't scan</small></span></label>
      <label><input type="radio" name="li" value="Missing"><span><b>Missing</b><small>The sticker fell off or was removed</small></span></label>
    </div>
    <div class="field"><label for="liNote">Note (optional)</label><input id="liNote" placeholder="e.g. water damage, label was on the leg"></div>
@@ -1933,7 +1970,7 @@ function openStocktake(){
   $("#stCam").onclick=()=>Scanner.open({continuous:true,title:"Stocktake · "+unitLabel(unit),hint:"Scan each label. Found items are ticked off as you go.",
     onCode:async tag=>{await scan(tag);const e=st.entries[0],n=active().filter(a=>st.found.has(a.tag)).length;
       return {text:(e?`${e.tag} ${e.text}`:tag)+`\n${n} of ${active().length} found`,bad:e&&e.cls==="bad"}}});
-  $("#stPhoto").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f) return;toast("Reading QR code…");const t=await decodePhoto(f);if(t){$("#toast").hidden=true;scan(t)}};
+  $("#stPhoto").onchange=async e=>{const f=e.target.files[0];e.target.value="";if(!f) return;toast("Reading barcode…");const t=await decodePhoto(f);if(t){$("#toast").hidden=true;scan(t)}};
   $("#stDone").onclick=async()=>{
     if(!st.entries.length){closeOverlay();return}
     const b=$("#stDone");b.disabled=true;b.textContent="Saving…";st.done=true;
@@ -2190,7 +2227,7 @@ $("#overlay").addEventListener("click",e=>{if(e.target.matches("[data-scrim]")||
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("#overlay").innerHTML) closeOverlay()});
 function applyWriteGate(){document.querySelectorAll("[data-write]").forEach(b=>b.hidden=!S.canWrite)}
 
-/* ---------- Deep link from QR ---------- */
+/* ---------- Deep link (?tag=) ---------- */
 function hashTag(){let t="";try{t=new URLSearchParams(location.search).get("tag")||""}catch(e){}return t?parseScan(t):""}
 window.addEventListener("hashchange",()=>{const t=hashTag();if(t&&!$("#detail")) openAsset(t)});
 
@@ -2371,7 +2408,7 @@ async function deleteInventory(id){
   if((d.lines||[]).some(l=>(l.tagged||0)>0)) throw new Error("This inventory has tagged items, so it can't be deleted. Its tagged items stay in the register either way.");
   await S.db.doc("inventories/"+id).delete();return true;
 }
-/** Creates a QR-tagged asset for every untagged piece. Returns [{tag,unit,name}]. */
+/** Creates a tagged asset for every untagged piece. Returns [{tag,unit,name}]. */
 async function tagInventory(id,progress){
   const ref=S.db.doc("inventories/"+id),inv=(await ref.get()).data();
   if(!inv) throw new Error("Inventory not found.");
