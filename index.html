@@ -139,6 +139,7 @@ form.grid .full{grid-column:1/-1}
 .row-end{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 pre.sample{background:var(--sunk);border-radius:var(--r);padding:10px;font-family:var(--f-mono);font-size:12px;overflow-x:auto;margin:0}
 
+.upd{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:70;display:flex;align-items:center;gap:12px;background:var(--ink);color:var(--bg);padding:8px 8px 8px 16px;border-radius:var(--r);box-shadow:0 6px 24px rgb(0 0 0 / .25);font-size:14px;max-width:calc(100% - 32px)}.upd[hidden]{display:none}.upd b{font-weight:600}.upd .btn{background:var(--accent);color:var(--accent-ink);border-color:transparent;padding:6px 12px}.upd span{flex:1}.upd .x{background:transparent;color:inherit;border:0;font-size:20px;line-height:1;padding:2px 6px;cursor:pointer;opacity:.7}@media (max-width:560px){.upd{left:12px;right:12px;transform:none;max-width:none;font-size:13.5px}}
 .toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r);z-index:60;max-width:calc(100% - 32px);font-size:14px;box-shadow:0 6px 24px rgb(0 0 0 / .25)}
 .selbar{position:sticky;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);align-self:center;display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--ink);color:var(--bg);padding:8px 10px 8px 16px;border-radius:999px;box-shadow:0 8px 28px rgb(0 0 0 / .25)}
 .selbar .btn{border-radius:999px}
@@ -250,6 +251,31 @@ img.broken{visibility:hidden}
 .vlist .vc{grid-column:2;grid-row:1/3;align-self:center;font-size:12.5px;color:var(--muted);white-space:nowrap}
 .minibar{width:64px;height:6px;border-radius:99px;background:var(--sunk);overflow:hidden;display:inline-block;vertical-align:middle;margin-right:6px}
 .minibar i{display:block;height:100%;background:var(--ok)}
+/* Dashboard */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;display:grid;gap:2px;align-content:start}
+.kpi .k{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-family:var(--f-display);font-stretch:85%;font-weight:700;font-size:28px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi .s{color:var(--muted);font-size:13px}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:14px;align-items:start}
+.dpanel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);min-width:0}
+.dash{display:grid;gap:14px;min-width:0}
+.dpanel .dhd{display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:12px 14px 8px}
+.dpanel .dhd h3{font-size:18px;margin:0}
+.dpanel .dhd .muted{font-size:13px}
+.dl{list-style:none;margin:0;padding:0 0 6px}
+.dl li{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 12px;align-items:center;padding:8px 14px;border-top:1px solid var(--line)}
+.dl li[data-go]{cursor:pointer}.dl li[data-go]:hover{background:var(--bg)}
+.dl .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dl .n{font-family:var(--f-mono);font-size:13.5px;text-align:right;white-space:nowrap}
+.dl .x{grid-column:1/-1;color:var(--muted);font-size:12.5px}
+.dbar{grid-column:1/-1;height:6px;border-radius:99px;background:var(--sunk);overflow:hidden}
+.dbar i{display:block;height:100%;background:var(--accent)}
+.dnote{padding:4px 14px 14px;color:var(--muted);font-size:13.5px;margin:0}
+.dchips{display:flex;flex-wrap:wrap;gap:6px;padding:4px 14px 14px}
+.dchips button{all:unset;cursor:pointer}
+.when-bad{color:var(--bad);font-weight:600}.when-warn{color:var(--warn);font-weight:600}
+
 .linkback{all:unset;cursor:pointer;color:var(--muted);font-size:13.5px;margin-bottom:4px;display:inline-block}
 .linkback:hover{color:var(--ink)}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px}
@@ -670,6 +696,7 @@ function renderUnits(){
   const total=S.units.reduce((a,u)=>a+(u.count||0),0);
   $("#unitList").innerHTML =
     `<li><button data-unit="" aria-current="${!S.unit&&!S.view&&!S.prop}"><span class="code">ALL</span><span class="nm">All properties</span><span class="ct">${total}</span></button></li>`+
+    `<li><button data-unit="__dashboard" aria-current="${S.view==="dashboard"}"><span class="code nav">DSH</span><span class="nm">Dashboard</span><span class="ct"></span></button></li>`+
     `<li><button data-unit="__products" aria-current="${S.view==="products"}"><span class="code nav">AST</span><span class="nm">Assets</span><span class="ct">${S.cat?S.cat.products.filter(p=>p.active).length:""}</span></button></li>`+
     `<li><button data-unit="__inventories" aria-current="${S.view==="inventories"||S.view==="inv-edit"||S.view==="documents"}"><span class="code nav">INV</span><span class="nm">Inventories</span><span class="ct">${S.invs?S.invs.length:""}</span></button></li>`+
     `<li><button data-unit="__transfers" aria-current="${S.view==="transfers"}"><span class="code nav">TRF</span><span class="nm">Transfers</span><span class="ct"></span></button></li>`+
@@ -677,7 +704,7 @@ function renderUnits(){
     groupedUnits(list).map(g=>{const open=f||!S.collapsed[g.prop]||g.units.some(u=>u.code===S.unit);const n=g.units.reduce((a,u)=>a+(u.count||0),0);
       return `<li class="prop"><button data-prop="${esc(g.prop)}" aria-expanded="${!!open}" aria-current="${!S.unit&&!S.view&&S.prop===g.prop&&g.prop!==""}"><span class="chev" aria-hidden="true">${open?"▾":"▸"}</span><span class="nm">${esc(g.name)}</span><span class="ct">${n}</span></button></li>`+
       (open?g.units.map(u=>`<li class="sub"><button data-unit="${esc(u.code)}" aria-current="${S.unit===u.code}"><span class="code">${esc(u.unitCode||u.code)}</span><span class="nm">${esc(u.name)}</span><span class="ct">${u.count||0}</span></button></li>`).join(""):"")}).join("");
-  $("#unitSelect").innerHTML=`<option value="">All units (${S.units.length})</option><option value="__products" ${S.view==="products"?"selected":""}>Assets</option><option value="__inventories" ${S.view==="inventories"||S.view==="inv-edit"||S.view==="documents"?"selected":""}>Inventories</option><option value="__transfers" ${S.view==="transfers"?"selected":""}>Transfers</option><option value="__reprint" ${S.view==="reprint"?"selected":""}>Labels to reprint (${S.reprint.length})</option>`+groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="__prop:${esc(g.prop)}" ${!S.unit&&!S.view&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("");
+  $("#unitSelect").innerHTML=`<option value="">All units (${S.units.length})</option><option value="__dashboard" ${S.view==="dashboard"?"selected":""}>Dashboard</option><option value="__products" ${S.view==="products"?"selected":""}>Assets</option><option value="__inventories" ${S.view==="inventories"||S.view==="inv-edit"||S.view==="documents"?"selected":""}>Inventories</option><option value="__transfers" ${S.view==="transfers"?"selected":""}>Transfers</option><option value="__reprint" ${S.view==="reprint"?"selected":""}>Labels to reprint (${S.reprint.length})</option>`+groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="__prop:${esc(g.prop)}" ${!S.unit&&!S.view&&S.prop===g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${S.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("");
 }
 $("#unitList").addEventListener("click",e=>{
   const pb=e.target.closest("button[data-prop]");
@@ -697,6 +724,10 @@ function selectUnit(code,force){
   if(S.unsubAssets){S.unsubAssets();S.unsubAssets=null}
   S.prop=null;
   if(code&&code.startsWith("__prop:")){S.view=null;S.unit=null;S.prop=code.slice(7);S.assets=[];renderUnits();renderView();return}
+  if(code==="__dashboard"){S.view="dashboard";S.unit=null;S.assets=[];S.dashAssets=null;renderUnits();renderView();
+    Promise.all([loadCatalog(),loadInvs()]).then(()=>{if(S.view==="dashboard"){renderUnits();renderView()}});
+    if(S.db) S.unsubAssets=S.db.collection("assets").limit(5000).onSnapshot(s=>{S.dashAssets=s.docs.map(d=>d.data());if(S.view==="dashboard"&&!$("#overlay").innerHTML) renderView()},e=>{S.dashAssets=[];console.warn("assets",e)});
+    return}
   if(code==="__reprint"){S.view="reprint";S.unit=null;S.assets=[];renderUnits();renderView();return}
   if(code==="__documents"){S.view="documents";S.unit=null;S.assets=[];renderUnits();renderView();return}
   if(code==="__transfers"){S.view="transfers";S.unit=null;S.assets=[];S.transfers=null;renderUnits();renderView();return}
@@ -802,6 +833,7 @@ $("#addUnitsBtn").onclick=openAddUnits;$("#addUnitsBtnM").onclick=openAddUnits;
 function renderView(){
   const v=$("#view");
   if(!S.db){v.innerHTML=S.dbMissing?`<div class="empty"><h3>Sign in to use the register</h3><p>The register is shared with your organisation. Open this page while signed in to claude.ai to see and update assets.</p></div>`:`<div class="empty"><h3>Loading the register…</h3></div>`;return}
+  if(S.view==="dashboard") return renderDashboard(v);
   if(S.view==="products") return renderProducts(v);
   if(S.view==="inventories") return renderInventories(v);
   if(S.view==="inv-edit") return renderInvEditor(v);
@@ -1133,6 +1165,82 @@ function openBulkStatus(){
       closeOverlay();toast("Status updated");S.selected.clear();renderView()}catch(e){b.disabled=false;writeErr(e)}};
 }
 
+/* ---------- Dashboard ---------- */
+const DASH_WARN_DAYS=90;
+function dayDiff(iso){if(!iso) return null;const t=Date.parse(iso+"T00:00:00");if(isNaN(t)) return null;const d=new Date();d.setHours(0,0,0,0);return Math.round((t-d.getTime())/864e5)}
+function renderDashboard(v){
+  if(!S.invs||!S.cat){v.innerHTML=`<div class="empty"><h3>Loading dashboard…</h3></div>`;return}
+  const byId={};S.cat.products.forEach(p=>byId[p.id]=p);
+  const unitStat={},catStat={};let items=0,value=0,tagged=0;
+  (S.invDocs||[]).forEach(inv=>{if(!inv||!inv.id) return;const u=unitStat[inv.unit]=unitStat[inv.unit]||{items:0,value:0,invs:0};u.invs++;
+    (inv.lines||[]).forEach(l=>{const q=+l.qty||0,p=byId[l.productId],val=q*(p?p.price:0);u.items+=q;u.value+=val;items+=q;value+=val;tagged+=Math.min(+l.tagged||0,q);
+      const c=(p&&p.category)||"Uncategorised";const cs=catStat[c]=catStat[c]||{items:0,value:0};cs.items+=q;cs.value+=val})});
+  const groups=groupedUnits();
+  const props=groups.map(g=>({prop:g.prop,name:g.name,units:g.units.length,covered:g.units.filter(u=>unitStat[u.code]).length,
+    items:g.units.reduce((t,u)=>t+(unitStat[u.code]?unitStat[u.code].items:0),0),value:g.units.reduce((t,u)=>t+(unitStat[u.code]?unitStat[u.code].value:0),0)}));
+  const cats=Object.entries(catStat).map(([c,x])=>({c,...x})).sort((a,b)=>b.items-a.items);
+  const maxP=Math.max(1,...props.map(p=>p.items)),maxC=Math.max(1,...cats.map(c=>c.items));
+  const covered=S.units.filter(u=>unitStat[u.code]).length,noInv=S.units.filter(u=>!unitStat[u.code]);
+  const activeProducts=S.cat.products.filter(p=>p.active).length;
+  const drafts=S.invs.filter(i=>i.status==="Draft").map(i=>({...i,age:dayDiff(i.date)})).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+  const invCount=s=>S.invs.filter(i=>i.status===s).length;
+  const A=S.dashAssets;
+  const live=A?A.filter(a=>a.status!=="Disposed"):[];
+  const stCount={};(A||[]).forEach(a=>stCount[a.status]=(stCount[a.status]||0)+1);
+  const notSeen=live.filter(a=>daysAgo(a.verifiedAt)===null||daysAgo(a.verifiedAt)>180).length;
+  const wDocs=(S.docs||[]).filter(d=>d&&(d.type==="Warranty"||d.expires));
+  const ending=wDocs.filter(d=>d.expires).map(d=>({...d,left:dayDiff(d.expires)})).filter(d=>d.left!==null&&d.left<=DASH_WARN_DAYS).sort((a,b)=>a.left-b.left);
+  const noEnd=wDocs.filter(d=>!d.expires).length;
+  const pct=(a,b)=>b?Math.round(a/b*100):0;
+  const whenTxt=n=>n<0?`<span class="when-bad">ended ${-n} day${n===-1?"":"s"} ago</span>`:n===0?`<span class="when-bad">ends today</span>`:`<span class="${n<=30?"when-bad":"when-warn"}">ends in ${n} day${n===1?"":"s"}</span>`;
+  const attention=drafts.length+(stCount["Missing"]||0)+(stCount["Under repair"]||0)+S.reprint.length+ending.length;
+  v.innerHTML=`<div class="dash"><div class="pagehead"><div><span class="eyebrow">Overview</span><h2>Dashboard</h2><div class="sub"><span class="num">${groups.filter(g=>g.prop).length}</span> properties · <span class="num">${S.units.length}</span> units · updates live</div></div>
+    <div class="actions"><button class="btn" onclick="openReport()">Inventory report</button></div></div>
+    <div class="kpis">
+      <div class="kpi"><span class="k">Items placed</span><span class="v">${items.toLocaleString()}</span><span class="s">in ${S.invs.length} inventor${S.invs.length===1?"y":"ies"}</span></div>
+      <div class="kpi"><span class="k">Inventory value</span><span class="v"><span style="font-size:15px;color:var(--muted)">${esc(S.cat.currency)}</span> ${Math.round(value).toLocaleString()}</span><span class="s">at catalogue prices</span></div>
+      <div class="kpi"><span class="k">Assets</span><span class="v">${activeProducts.toLocaleString()}</span><span class="s">types in the catalogue</span></div>
+      <div class="kpi"><span class="k">Tagged</span><span class="v">${pct(tagged,items)}%</span><span class="s">${tagged.toLocaleString()} of ${items.toLocaleString()} items</span></div>
+      <div class="kpi"><span class="k">Units covered</span><span class="v">${covered}<span style="font-size:18px;color:var(--muted)">/${S.units.length}</span></span><span class="s">have an inventory</span></div>
+      <div class="kpi"><span class="k">Needs attention</span><span class="v" style="${attention?"color:var(--warn)":""}">${attention}</span><span class="s">see list below</span></div>
+    </div>
+    <div class="dgrid">
+      <section class="dpanel" aria-labelledby="dh-prop"><div class="dhd"><h3 id="dh-prop">By property</h3><span class="muted">items · value</span></div>
+        <ul class="dl">${props.map(p=>`<li ${p.prop?`data-go="__prop:${esc(p.prop)}"`:""}><span class="t"><b>${esc(p.name)}</b> <span class="muted">· ${p.covered}/${p.units} units</span></span><span class="n">${p.items.toLocaleString()} · ${money(p.value)}</span><div class="dbar"><i style="width:${p.items/maxP*100}%"></i></div></li>`).join("")||`<li><span class="t muted">No properties yet</span></li>`}</ul></section>
+      <section class="dpanel" aria-labelledby="dh-cat"><div class="dhd"><h3 id="dh-cat">By category</h3><span class="muted">items · value</span></div>
+        ${cats.length?`<ul class="dl">${cats.map(c=>`<li data-cat="${esc(c.c)}"><span class="t">${esc(c.c)}</span><span class="n">${c.items.toLocaleString()} · ${money(c.value)}</span><div class="dbar"><i style="width:${c.items/maxC*100}%"></i></div></li>`).join("")}</ul>`:`<p class="dnote">No inventories yet.</p>`}</section>
+      <section class="dpanel" aria-labelledby="dh-att"><div class="dhd"><h3 id="dh-att">Needs attention</h3><span class="muted">${attention} item${attention===1?"":"s"}</span></div>
+        <ul class="dl">
+          ${drafts.map(i=>`<li data-inv="${esc(i.id)}" data-go="1"><span class="t"><span class="tagchip">${esc(i.id)}</span> ${esc(i.name||"Inventory")}</span><span class="n"><span class="pill ${invStatusCls("Draft")}"><span class="dot"></span>Draft</span></span><span class="x">${esc(unitLabel(i.unit))}${i.age!==null&&i.age<0?` · ${-i.age} day${i.age===-1?"":"s"} old`:""}</span></li>`).join("")}
+          ${S.reprint.length?`<li data-go="__reprint"><span class="t">Labels to reprint</span><span class="n">${S.reprint.length}</span></li>`:""}
+          ${stCount["Missing"]?`<li><span class="t">Tagged items marked Missing</span><span class="n when-bad">${stCount["Missing"]}</span></li>`:""}
+          ${stCount["Under repair"]?`<li><span class="t">Tagged items under repair</span><span class="n">${stCount["Under repair"]}</span></li>`:""}
+          ${ending.length?`<li data-wgo="1" data-go="1"><span class="t">Warranties ending within ${DASH_WARN_DAYS} days</span><span class="n when-warn">${ending.length}</span></li>`:""}
+          ${attention?"":`<li><span class="t muted">Nothing needs attention.</span></li>`}
+        </ul>
+        ${noInv.length?`<p class="dnote" style="padding-top:10px;border-top:1px solid var(--line)">${noInv.length} unit${noInv.length===1?" has":"s have"} no inventory yet:</p><div class="dchips">${noInv.map(u=>`<button data-unit="${esc(u.code)}" title="${esc(unitLabel(u.code))}"><span class="tagchip">${esc(u.code)}</span></button>`).join("")}</div>`:""}</section>
+      <section class="dpanel" aria-labelledby="dh-war"><div class="dhd"><h3 id="dh-war">Warranties</h3><span class="muted">ending within ${DASH_WARN_DAYS} days</span></div>
+        ${ending.length?`<ul class="dl">${ending.map(d=>`<li data-doc="${esc(d.id)}" data-go="1"><span class="t"><b>${esc(d.number||d.id)}</b>${d.vendor?` <span class="muted">· ${esc(d.vendor)}</span>`:""}</span><span class="n">${whenTxt(d.left)}</span><span class="x">${esc(fmtDate(Date.parse(d.expires+"T00:00:00")))}${d.unit?" · "+esc(unitLabel(d.unit)):""}${d.notes?" · "+esc(d.notes):""}</span></li>`).join("")}</ul>`
+          :`<p class="dnote">${wDocs.length?"No warranties end in the next "+DASH_WARN_DAYS+" days.":"No warranty documents yet."}</p>`}
+        <p class="dnote">${noEnd?`${noEnd} warranty document${noEnd===1?" has":"s have"} no end date. `:""}Upload a warranty under Inventories → Documents and fill in <b>Warranty ends</b> to get reminders here.</p></section>
+      <section class="dpanel" aria-labelledby="dh-tag"><div class="dhd"><h3 id="dh-tag">Tagged items</h3><span class="muted">${A?`${A.length.toLocaleString()} total`:"loading…"}</span></div>
+        ${A?`<div class="dchips" style="padding-top:2px">${STATUSES.map(s=>`<span class="pill ${s.cls}"><span class="dot"></span>${esc(s.v)} <b class="num">${stCount[s.v]||0}</b></span>`).join("")}</div>
+          <p class="dnote">${notSeen?`<span class="stale">${notSeen.toLocaleString()} not checked in the last 6 months.</span> Run a stocktake in each unit to update them.`:"All tagged items were checked in the last 6 months."}</p>`:`<p class="dnote">Loading…</p>`}</section>
+      <section class="dpanel" aria-labelledby="dh-inv"><div class="dhd"><h3 id="dh-inv">Inventories by status</h3><span class="muted">${S.invs.length} total</span></div>
+        <ul class="dl">${INV_STATUSES.map(s=>`<li data-ist="${esc(s)}" data-go="1"><span class="t"><span class="pill ${invStatusCls(s)}"><span class="dot"></span>${esc(s)}</span></span><span class="n">${invCount(s)}</span></li>`).join("")}</ul></section>
+    </div></div>`;
+  v.onclick=e=>{
+    const ch=e.target.closest("[data-unit]");if(ch) return selectUnit(ch.dataset.unit);
+    const li=e.target.closest("li");if(!li) return;
+    if(li.dataset.cat!==undefined){S.pf.category=li.dataset.cat==="Uncategorised"?"":li.dataset.cat;return selectUnit("__products")}
+    if(li.dataset.inv) return openInventory(li.dataset.inv);
+    if(li.dataset.doc){const d=(S.docs||[]).find(x=>x.id===li.dataset.doc);if(d) openDocForm(d);return}
+    if(li.dataset.wgo){S.docFilter={q:"",type:"Warranty",unit:""};selectUnit("__inventories");S.view="documents";renderUnits();renderView();return}
+    if(li.dataset.ist){S.invFilter={unit:"",status:li.dataset.ist};return selectUnit("__inventories")}
+    if(li.dataset.go&&li.dataset.go!=="1") return selectUnit(li.dataset.go);
+  };
+}
+
 /* ---------- Documents (PO, DO, invoices) ---------- */
 const DOC_TYPES=["Purchase order (PO)","Delivery order (DO)","Invoice","Quotation","Warranty","Receipt","Other"];
 const docShort=t=>({"Purchase order (PO)":"PO","Delivery order (DO)":"DO"})[t]||t||"Doc";
@@ -1156,7 +1264,7 @@ function renderDocuments(v){
       <select id="docType" aria-label="Type"><option value="">All types</option>${DOC_TYPES.map(t=>`<option ${f.type===t?"selected":""}>${esc(t)}</option>`).join("")}</select>
       <select id="docUnit" aria-label="Property or unit"><option value="">All properties and units</option>${groupedUnits().map(g=>`<optgroup label="${esc(g.name)}">${g.prop?`<option value="P:${esc(g.prop)}" ${f.unit==="P:"+g.prop?"selected":""}>All of ${esc(g.name)}</option>`:""}${g.units.map(u=>`<option value="${esc(u.code)}" ${f.unit===u.code?"selected":""}>${esc(u.name)}</option>`).join("")}</optgroup>`).join("")}</select></div>
     ${rows.length?`<div class="ledger-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Type</th><th>Number</th><th>Vendor</th><th>Unit</th><th>Inventory</th><th style="text-align:right">Amount</th><th>Files</th></tr></thead><tbody>
-      ${rows.map(d=>`<tr data-doc="${esc(d.id)}"><td class="muted num" style="white-space:nowrap">${esc(docDate(d))}</td><td><span class="pill s-storage">${esc(docShort(d.type))}</span></td><td><b>${esc(d.number||d.id)}</b>${d.notes?`<div class="muted" style="font-size:12.5px">${esc(d.notes)}</div>`:""}</td><td>${esc(d.vendor||"")}</td><td>${d.unit?esc(unitLabel(d.unit)):`<span class="muted">—</span>`}</td><td>${d.inventory?`<span class="tagchip">${esc(d.inventory)}</span>`:""}</td><td class="num" style="text-align:right;white-space:nowrap">${d.amount!==""&&d.amount!=null?money(d.amount):""}</td><td>${fileChips(d.files)}</td></tr>`).join("")}
+      ${rows.map(d=>`<tr data-doc="${esc(d.id)}"><td class="muted num" style="white-space:nowrap">${esc(docDate(d))}${d.expires?`<div style="font-size:12px">Ends ${esc(fmtDate(Date.parse(d.expires+"T00:00:00")))}</div>`:""}</td><td><span class="pill s-storage">${esc(docShort(d.type))}</span></td><td><b>${esc(d.number||d.id)}</b>${d.notes?`<div class="muted" style="font-size:12.5px">${esc(d.notes)}</div>`:""}</td><td>${esc(d.vendor||"")}</td><td>${d.unit?esc(unitLabel(d.unit)):`<span class="muted">—</span>`}</td><td>${d.inventory?`<span class="tagchip">${esc(d.inventory)}</span>`:""}</td><td class="num" style="text-align:right;white-space:nowrap">${d.amount!==""&&d.amount!=null?money(d.amount):""}</td><td>${fileChips(d.files)}</td></tr>`).join("")}
     </tbody></table></div>`:`<div class="empty"><h3>${S.docs.length?"No documents match":"No documents yet"}</h3><p>Upload purchase orders, delivery orders, invoices or warranties as a PDF or a photo. Link each one to a unit and inventory so it's easy to find for audits and move-outs.</p></div>`}`;
   const qi=$("#docQ");qi.oninput=e=>{f.q=e.target.value;renderView()};if(keep){qi.focus();qi.setSelectionRange(qi.value.length,qi.value.length)}
   $("#docType").onchange=e=>{f.type=e.target.value;renderView()};$("#docUnit").onchange=e=>{f.unit=e.target.value;renderView()};
@@ -1176,6 +1284,7 @@ function openDocForm(doc,pre){
     <div class="field"><label for="dc-type">Type</label><select id="dc-type">${DOC_TYPES.map(t=>`<option ${d.type===t?"selected":""}>${esc(t)}</option>`).join("")}</select></div>
     <div class="field"><label for="dc-no">Document number</label><input id="dc-no" value="${esc(d.number)}" placeholder="e.g. PO-2026-0153"></div>
     <div class="field"><label for="dc-date">Date</label><input id="dc-date" type="date" value="${esc(d.date)}"></div>
+    <div class="field"><label for="dc-exp">Warranty ends <span class="hint">(optional)</span></label><input id="dc-exp" type="date" value="${esc(d.expires||"")}"></div>
     <div class="field"><label for="dc-vendor">Vendor</label><input id="dc-vendor" list="dl-dcven" value="${esc(d.vendor)}"><datalist id="dl-dcven">${(S.cat?S.cat.vendors:[]).map(x=>`<option value="${esc(x.name)}">`).join("")}</datalist></div>
     <div class="field"><label for="dc-unit">Unit</label><select id="dc-unit"><option value="">Not linked to a unit</option>${unitOptions(d.unit)}</select></div>
     <div class="field"><label for="dc-inv">Inventory</label><select id="dc-inv"><option value="">Not linked</option>${invOpts(d.unit)}</select></div>
@@ -1212,7 +1321,7 @@ function openDocForm(doc,pre){
         for(;;n++){id="DOC-"+pad4(n);if(!(await S.db.doc("documents/"+id).get()).exists) break}}
       const now=Date.now(),g=k=>$("#"+k).value.trim();
       const rec={id,type:g("dc-type"),number:g("dc-no").slice(0,100),date:g("dc-date"),vendor:g("dc-vendor").slice(0,200),unit:g("dc-unit"),inventory:g("dc-inv"),
-        amount:g("dc-amt")===""?"":num(g("dc-amt")),notes:g("dc-notes").slice(0,1000),files:[...files,...up].slice(0,20),
+        amount:g("dc-amt")===""?"":num(g("dc-amt")),expires:g("dc-exp"),notes:g("dc-notes").slice(0,1000),files:[...files,...up].slice(0,20),
         createdAt:d.createdAt||now,createdBy:d.createdBy||S.me||null,updatedAt:now,updatedBy:S.me||null};
       await S.db.doc("documents/"+id).set(rec);
       for(const f of removed){try{await window.deleteDocFile(f.id)}catch(err){}}
@@ -2273,7 +2382,7 @@ function buildCat(){
 }
 function onCatChange(){
   renderUnits();
-  if(S.view==="products"||S.view==="inventories") renderView();
+  if(S.view==="products"||S.view==="inventories"||(S.view==="dashboard"&&!$("#overlay").innerHTML)) renderView();
   if(S.view==="inv-edit"&&!S.dirty&&!$("#overlay").innerHTML&&!document.activeElement?.closest?.("#view input,#view select,#view textarea")) renderView();
 }
 
@@ -2841,9 +2950,38 @@ renderUnits();renderView();
     renderView();
   },e=>{toast("Couldn't load units: "+e.message)});
   db.collection("documents").limit(1000).onSnapshot(snap=>{S.docs=snap.docs.map(d=>d.data()).filter(d=>d&&d.id);renderUnits();
-    if(S.view==="documents"&&!$("#overlay").innerHTML) renderView();if(S.view==="inv-edit"&&!S.dirty&&!$("#overlay").innerHTML) renderView()},e=>{S.docs=[];console.warn("documents",e)});
+    if((S.view==="documents"||S.view==="dashboard")&&!$("#overlay").innerHTML) renderView();if(S.view==="inv-edit"&&!S.dirty&&!$("#overlay").innerHTML) renderView()},e=>{S.docs=[];console.warn("documents",e)});
   startCatalog();
   const t=S.pendingTag||hashTag();if(t) openAsset(t);
+})();
+</script>
+<script>
+/* New-version notice: compares this page's code with the copy on the server and offers a refresh when they differ. */
+(()=>{
+  const fp=d=>[...d.querySelectorAll("script:not([src]),style")].map(e=>e.textContent.replace(/\r/g,"")).join("\u0001");
+  const mine=fp(document);let shown=false,dismissed=0,last=0,busy=false;
+  async function check(force){
+    if(shown||busy||(!force&&Date.now()-last<60000)) return;busy=true;last=Date.now();
+    try{const u=new URL(location.pathname,location.origin);u.searchParams.set("v",Date.now());
+      const r=await fetch(u,{cache:"no-store"});if(!r.ok) return;const t=await r.text();
+      const d=new DOMParser().parseFromString(t,"text/html");if(!d.querySelector("script:not([src])")) return;
+      if(fp(d)!==mine&&Date.now()-dismissed>30*60000) show();
+    }catch(e){}finally{busy=false}
+  }
+  function show(){
+    shown=true;let b=document.getElementById("updBar");
+    if(!b){b=document.createElement("div");b.id="updBar";b.className="upd";b.setAttribute("role","status");
+      b.innerHTML='<span><b>New version available.</b> Refresh to update.</span><button class="btn" type="button">Refresh</button><button class="x" type="button" aria-label="Later" title="Later">×</button>';
+      b.querySelector(".btn").onclick=async()=>{b.querySelector(".btn").textContent="Saving…";try{if(window.twcFlush) await window.twcFlush()}catch(e){}location.reload()};
+      b.querySelector(".x").onclick=()=>{b.hidden=true;shown=false;dismissed=Date.now()};
+      document.body.appendChild(b)}
+    b.hidden=false;
+  }
+  window.twcCheckUpdate=()=>check(true);
+  setTimeout(()=>check(true),15000);
+  setInterval(()=>{if(!document.hidden) check()},5*60000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden) check()});
+  window.addEventListener("online",()=>check());
 })();
 </script>
 
